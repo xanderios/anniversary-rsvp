@@ -33,11 +33,56 @@ const SELO = `
     <ellipse cx="88" cy="97" rx="12" ry="5" transform="rotate(-38 88 97)" fill="url(#wx-shine)" opacity=".35"/>
   </svg>`;
 
+// The envelope is drawn as paper: a soft blush stock with a fine grain, a pointed flap with a
+// rounded tip, the seams of the side and bottom flaps, and the shade each fold casts on the next.
+// Units: 780 x 538 (the flap is the top 312).
+const ABA = 'M0,0H780V16Q780,30 768,39L413,298Q390,315 367,298L12,39Q0,30 0,16Z';
+const PAPEL = `
+  <svg class="lt-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs>
+    <filter id="env-grao" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="7" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 .5  0 0 0 0 .3  0 0 0 0 .24  0 0 0 .3 -.1" result="g"/>
+      <feTurbulence type="fractalNoise" baseFrequency=".012 .5" numOctaves="2" seed="3" result="f"/>
+      <feColorMatrix in="f" type="matrix" values="0 0 0 0 1  0 0 0 0 .97  0 0 0 0 .94  0 0 0 .42 -.16" result="fi"/>
+      <feMerge result="m"><feMergeNode in="SourceGraphic"/><feMergeNode in="g"/><feMergeNode in="fi"/></feMerge>
+      <feComposite in="m" in2="SourceAlpha" operator="in"/>
+    </filter>
+    <filter id="env-sombra" x="-10%" y="-10%" width="120%" height="130%"><feGaussianBlur stdDeviation="7"/></filter>
+    <linearGradient id="env-lado-e" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#F3E1D5"/><stop offset="1" stop-color="#E9D1C3"/></linearGradient>
+    <linearGradient id="env-lado-d" x1="1" x2="0" y1="0" y2="0"><stop offset="0" stop-color="#F3E1D5"/><stop offset="1" stop-color="#E8CFC1"/></linearGradient>
+    <linearGradient id="env-baixo" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#EFDACC"/><stop offset="1" stop-color="#F5E5DA"/></linearGradient>
+    <linearGradient id="env-aba" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#F7E8DE"/><stop offset=".7" stop-color="#F1DDD0"/><stop offset="1" stop-color="#EBD3C5"/></linearGradient>
+    <linearGradient id="env-forro" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#F4D2D4"/><stop offset="1" stop-color="#EDBEC5"/></linearGradient>
+    <clipPath id="env-canto"><rect width="780" height="538" rx="9"/></clipPath>
+  </defs></svg>`;
+const BOLSO = `
+  <svg viewBox="0 0 780 538" aria-hidden="true" focusable="false"><g clip-path="url(#env-canto)">
+    <g filter="url(#env-grao)">
+      <path d="M0,0L404,300L0,538Z" fill="url(#env-lado-e)"/>
+      <path d="M780,0L376,300L780,538Z" fill="url(#env-lado-d)"/>
+    </g>
+    <path d="M-6,542L372,266Q390,253 408,266L786,542" fill="none" stroke="#8F5E4C" stroke-opacity=".34" stroke-width="12" filter="url(#env-sombra)" class="env-so"/>
+    <path d="M0,538L372,266Q390,253 408,266L780,538Z" fill="url(#env-baixo)" filter="url(#env-grao)"/>
+    <path d="M2,537L372,267.5Q390,254.5 408,267.5L778,537" fill="none" stroke="#FFFAF5" stroke-opacity=".75" stroke-width="1.6"/>
+    <rect x=".8" y=".8" width="778.4" height="536.4" rx="8.4" fill="none" stroke="#FFFAF5" stroke-opacity=".5" stroke-width="1.6"/>
+  </g></svg>`;
+const ABA_FORA = `
+  <svg viewBox="0 0 780 312" aria-hidden="true" focusable="false">
+    <g class="env-lo" fill="#8F5E4C" fill-opacity=".1"><path d="${ABA}" transform="translate(0 3)"/><path d="${ABA}" transform="translate(0 6.5)"/><path d="${ABA}" transform="translate(0 10)"/></g>
+    <path d="${ABA}" fill="url(#env-aba)" filter="url(#env-grao)"/>
+    <path d="M13,40.5L367.5,299Q390,315.5 412.5,299L767,40.5" fill="none" stroke="#FFFAF5" stroke-opacity=".7" stroke-width="1.6"/>
+  </svg>`;
+const ABA_DENTRO = `
+  <svg viewBox="0 0 780 312" aria-hidden="true" focusable="false">
+    <path d="${ABA}" fill="#F1DDD0" filter="url(#env-grao)"/>
+    <path d="M22,10H758V17Q758,26 750,32L404,285Q390,295 376,285L30,32Q22,26 22,17Z" fill="url(#env-forro)"/>
+  </svg>`;
+
 export function createLetter(stage, dados, { token, onOpen }) {
   const ev = dados.evento;
   stage.innerHTML = `
-    <div class="lt">
-      <div class="lt-env lt-envb"><div class="lt-inside"></div><div class="lt-flap lt-flap-in"><div class="lt-flap-face"></div></div></div>
+    <div class="lt">${PAPEL}
+      <div class="lt-env lt-envb"><div class="lt-inside"></div><div class="lt-flap lt-flap-in"><div class="lt-flap-face">${ABA_DENTRO}</div></div></div>
       <div class="lt-sheet" aria-hidden="true">
         <div class="lt-panel lt-mid"><div class="lt-face" style="--i:1"></div></div>
         <div class="lt-panel lt-bot"><div class="lt-face" style="--i:2"></div><div class="lt-face back"></div></div>
@@ -45,9 +90,9 @@ export function createLetter(stage, dados, { token, onOpen }) {
         <i class="lt-crease c1"></i><i class="lt-crease c2"></i>
       </div>
       <div class="lt-env lt-envf">
-        <div class="lt-pocket"><i></i><i></i><i></i></div>
+        <div class="lt-pocket">${BOLSO}</div>
         <div class="lt-to"><small>Para</small><b></b></div>
-        <div class="lt-flap lt-flap-out"><div class="lt-flap-face"></div></div>
+        <div class="lt-flap lt-flap-out"><div class="lt-flap-face">${ABA_FORA}</div></div>
         <button class="lt-seal" type="button" data-act="open" aria-label="Abrir o convite: romper o selo de cera">${SELO}</button>
       </div>
       <div class="lt-open"><button class="btn pri" type="button" data-act="open">Abrir convite</button></div>

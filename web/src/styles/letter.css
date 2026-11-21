@@ -24,18 +24,21 @@ body.q-low #veil { background: rgba(108, 62, 72, .44); backdrop-filter: none; -w
 /* ---- envelope: back (inside + open flap) behind the letter, front (pocket, closed flap, seal) before it */
 .lt-env { position: absolute; left: calc(50% - var(--ew) / 2); width: var(--ew); height: calc(var(--ew) * .69); bottom: max(17%, 96px); font-size: calc(var(--ew) / 78); }
 .lt-envb { z-index: 1; } .lt-envf { z-index: 3; }
-.lt-inside { position: absolute; inset: 0; border-radius: 1.4em; background: linear-gradient(180deg, #EBC9C4, #F6DDD6 60%); box-shadow: 0 3em 5em -2.5em rgba(80, 35, 45, .75); }
+.lt-defs { position: absolute; }
+.lt-inside { position: absolute; inset: 0; border-radius: .9em; background: linear-gradient(180deg, #DCBDB0, #EBD2C6 62%); box-shadow: 0 3em 5em -2.5em rgba(80, 35, 45, .75), 0 .5em 1.2em -.4em rgba(80, 35, 45, .45); }
 body.q-low .lt-inside { box-shadow: 0 1.6em 2em -1.4em rgba(80, 35, 45, .6); }
+.lt-env svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
 .lt-flap { position: absolute; left: 0; top: 0; width: 100%; height: 58%; transform-origin: 50% 0; }
-.lt-flap-face { position: absolute; inset: 0; clip-path: polygon(0 0, 100% 0, 50% 100%); }
-.lt-flap-out .lt-flap-face { background: linear-gradient(180deg, #FFF7F1 0%, #F9E6DE 62%, #ECCFC6 100%); }
+.lt-flap-face { position: absolute; inset: 0; }
+.lt-flap-out { filter: drop-shadow(0 .5em .55em rgba(110, 62, 50, .4)); }      /* the closed flap's shade on the envelope */
 .lt-flap-in { opacity: 0; }
-.lt-flap-in .lt-flap-face { background: radial-gradient(circle at 50% 0%, #FADCDD, #F4C5CB 70%), #F6CDD1; }
-.lt-pocket { position: absolute; inset: 0; border-radius: 1.4em; overflow: hidden; }
-.lt-pocket i { position: absolute; inset: 0; }
-.lt-pocket i:nth-child(1) { clip-path: polygon(0 0, 52% 54%, 0 100%); background: linear-gradient(90deg, #FBEFE8, #F1DAD0); }
-.lt-pocket i:nth-child(2) { clip-path: polygon(100% 0, 48% 54%, 100% 100%); background: linear-gradient(270deg, #FBEFE8, #F0D8CE); }
-.lt-pocket i:nth-child(3) { clip-path: polygon(0 100%, 50% 47%, 100% 100%); background: linear-gradient(0deg, #FFFBF7, #FBEEE6); }
+.lt-pocket { position: absolute; inset: 0; }
+/* old phones: plain paper (no grain, no cast shade) */
+body.q-low .lt-env [filter] { filter: none; }
+body.q-low .lt-env .env-so { display: none; }
+.lt-env .env-lo { display: none; }                 /* the lightest preset's stand-in for the flap's cast shade */
+body.q-low .lt-env .env-lo { display: inline; }
+body.q-low .lt-flap-out { filter: none; }
 .lt-to { position: absolute; left: 4%; right: 4%; bottom: 6%; text-align: center; line-height: 1.05; }
 .lt-to small { display: block; font-size: max(3.1em, 12.5px); letter-spacing: .24em; text-transform: uppercase; color: var(--gold-ink); font-weight: 700; }
 .lt-to b { display: block; font-family: var(--script); font-weight: 400; font-size: 7.2em; color: var(--ink); white-space: nowrap; }
