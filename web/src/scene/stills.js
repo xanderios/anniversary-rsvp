@@ -1,26 +1,26 @@
-// Fallback journey for devices without WebGL, or with reduced motion turned on:
-// the same six moments as still renders, cross-fading with the scroll.
-const FRAMES = [
-  { p: 0.0, src: '01_longe', mobile: '01_longe_mobile' },
+// Fallback journey for devices without WebGL, or with reduced motion turned on: the same six
+// moments as still images of the scene, cross-fading with the scroll. Each exists wide and tall,
+// by day and by night (they are redrawn from the 3D scene itself: see "?fotos" in the README).
+export const FRAMES = [
+  { p: 0.0, src: '01_longe' },
   { p: 0.2, src: '02_descida' },
   { p: 0.6, src: '03_jardim' },
   { p: 0.76, src: '04_portoes' },
   { p: 0.87, src: '05_entrada' },
-  { p: 0.95, src: '06_salao', mobile: '06_salao_mobile' },
+  { p: 0.95, src: '06_salao', dentro: true },      // indoors: the same by day and by night
 ];
 
-export function createStills(box) {
+export function createStills(box, night = 0) {
   box.hidden = false;
   const imgs = FRAMES.map((f, i) => {
+    const nome = f.src + (night > 0.5 && !f.dentro ? '_noite' : '');
     const pic = document.createElement('picture');
-    if (f.mobile) {
-      const s = document.createElement('source');
-      s.media = '(orientation: portrait)';
-      s.srcset = `/stills/${f.mobile}.jpg`;
-      pic.appendChild(s);
-    }
+    const s = document.createElement('source');
+    s.media = '(orientation: portrait)';
+    s.srcset = `/stills/${nome}_mobile.jpg`;
+    pic.appendChild(s);
     const img = document.createElement('img');
-    img.src = `/stills/${f.src}.jpg`;
+    img.src = `/stills/${nome}.jpg`;
     img.alt = '';
     img.decoding = 'async';
     if (i > 1) img.loading = 'lazy';

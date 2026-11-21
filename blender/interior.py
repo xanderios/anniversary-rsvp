@@ -5,7 +5,7 @@
 # this scene's light (Cycles) into vertex colours, so the lights below are what the site shows.
 random.seed(5)
 PAL.update({
-    "h_frame": "#FFFBF6", "h_wall": "#F1E0CB", "h_floor": "#EADCCB", "h_rug": "#F8D6D8", "h_rug_line": "#E9AFBA",
+    "h_frame": "#FFFBF6", "h_wall": "#F1E0CB", "h_floor": "#E2D3C1", "h_rug": "#F8D6D8", "h_rug_line": "#E9AFBA",
     "h_castle": "#FBEFE2", "h_roof": "#F2B1C0", "h_drape": "#F7C6CD", "h_gold": "#DDB25E",
     "h_glow": "#FFD88A", "h_spot": "#FFF0CF", "h_niche": "#FFE3B4",
     "ped_pink": "#F8D0D5", "ped_stripe": "#F3BFC7", "ped_white": "#FFF9F4", "ped_white_stripe": "#F6EADF",

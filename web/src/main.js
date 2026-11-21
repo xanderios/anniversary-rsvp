@@ -57,6 +57,7 @@ async function start() {
   const fill = $('ld-fill'), txt = $('ld-txt');
   const progresso = (f) => { fill.style.width = Math.max(4, Math.round(f * 100)) + '%'; txt.textContent = `Preparando o jardim… ${Math.round(f * 100)}%`; };
   paintSky(nightAt());                       // blue by day, starry by night: the guest's own clock decides
+  if (import.meta.env.DEV && new URLSearchParams(location.search).has('fotos')) return tirarFotos(txt);
   let world = null, createWorld = null;
   let escolha = savedChoice(), nivel = null, detectado = null, trocando = false;   // escolha: auto | low | medium | high
   const marcar = () => { LEVELS.forEach((l) => document.body.classList.toggle('q-' + l, l === nivel)); };
@@ -83,7 +84,7 @@ async function start() {
   if (!world) {
     $('gl').hidden = true;
     const { createStills } = await import('./scene/stills.js');
-    world = createStills($('stills'));
+    world = createStills($('stills'), nightAt());
     await world.ready;
   }
   marcar();
@@ -138,6 +139,7 @@ async function start() {
     governor.reset(PRESETS[nivel].minScale, escolha === 'auto');
     settings?.update({ choice: escolha, level: nivel });
   }
+  if (import.meta.env.DEV) window.__cena = () => ({ nivel, escolha, escala: governor.scale, desenho: world.renderer?.info.render });   // for testing
   if (nivel) {
     governor.reset(PRESETS[nivel].minScale, escolha === 'auto');
     settings.update({ choice: escolha, level: nivel });
@@ -311,6 +313,34 @@ async function start() {
   intro.classList.add('on');
   document.body.classList.remove('locked');
   requestAnimationFrame((t) => { antes = t; loop(t); });
+}
+
+// Dev only (?fotos): redraws the still images of the fallback journey from the 3D scene and sends
+// them to the dev server, which saves them in web/public/stills (see vite.config.js).
+async function tirarFotos(txt) {
+  const [{ createWorld }, { FRAMES }] = await Promise.all([import('./scene/world.js'), import('./scene/stills.js')]);
+  const canvas = $('gl');
+  $('loader').style.display = 'none';
+  const world = await createWorld(canvas, null, { preset: { ...PRESETS.high, pixelRatio: 1 }, night: 0 });
+  let n = 0;
+  for (const [w, h, sufixo] of [[1152, 768, ''], [768, 1152, '_mobile']]) {
+    Object.assign(canvas.style, { inset: 'auto', left: '0', top: '0', width: w + 'px', height: h + 'px' });
+    for (const noite of [0, 1]) {
+      world.setNight(noite);
+      for (const f of FRAMES) {
+        if (noite && f.dentro) continue;
+        world.frame(f.dentro ? 1 : f.p, 0, null, 0);
+        const blob = await new Promise((ok) => canvas.toBlob(ok, 'image/jpeg', 0.86));   // read right after drawing
+        const nome = `${f.src}${noite ? '_noite' : ''}${sufixo}.jpg`;
+        const r = await fetch('/__still/' + nome, { method: 'POST', body: blob });
+        if (!r.ok) throw new Error('foto ' + nome);
+        n++;
+      }
+    }
+  }
+  document.title = `fotos: ${n}`;
+  txt.textContent = `${n} imagens salvas em web/public/stills`;
+  $('loader').style.display = '';
 }
 
 start();

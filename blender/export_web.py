@@ -296,7 +296,7 @@ def export(coll, path):
 # ================================================================ garden
 G = fresh_collection("WEB_garden")
 O = bpy.data.objects
-static_occluders = [O[n] for n in ("Terrain", "Path", "Castle", "Gate_L", "Gate_R", "Lamps")]
+static_occluders = [O[n] for n in ("Terrain", "Path", "Castle", "Gate_L", "Gate_R")]      # not the lamp posts: too thin to shade a wall
 trees = [o for o in ext.objects if o.type == "MESH" and o.name.startswith(("BlossomTree_", "Bush_", "GBush_", "Cypress_", "FarTreeA_"))]
 if Q["far"] < 1.0:        # fewer of the trees that only ever show small, far from the walk
     _far = [t for t in trees if t.name.startswith(("Cypress_", "FarTreeA_")) and (abs(t.location.x) > 34 or t.location.y > 14 or t.location.y < -70)]

@@ -178,8 +178,9 @@ const raiz = path.relative(process.cwd(), config.distDir) || '.';
 app.use('/assets/*', async (c, next) => { await next(); if (c.res.ok) c.header('Cache-Control', 'public, max-age=31536000, immutable'); });
 app.use('/img/*', async (c, next) => { await next(); if (c.res.ok) c.header('Cache-Control', 'public, max-age=86400'); });
 app.use('/stills/*', async (c, next) => { await next(); if (c.res.ok) c.header('Cache-Control', 'public, max-age=86400'); });
+app.use('/benchmarks/*', async (c, next) => { await next(); if (c.res.ok) c.header('Cache-Control', 'public, max-age=86400'); });   // GPU tables (detect-gpu)
 app.use('/assets/*', serveStatic({ root: raiz, precompressed: true, mimes: { glb: 'model/gltf-binary' } }));
-for (const p of ['/img/*', '/stills/*']) app.use(p, serveStatic({ root: raiz }));
+for (const p of ['/img/*', '/stills/*', '/benchmarks/*']) app.use(p, serveStatic({ root: raiz }));
 app.get('/favicon.svg', serveStatic({ root: raiz }));
 
 app.notFound((c) => (c.req.path.startsWith('/api/') ? c.json({ erro: 'Não encontrado.' }, 404) : html(c, 'fechado.html', 404)));

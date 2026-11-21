@@ -37,15 +37,38 @@ npm start                 # http://localhost:3000 (ou a PORT do .env)
 3. Rodar `npm start` como serviço (systemd ou pm2), ouvindo em 127.0.0.1.
 4. Colocar um proxy com HTTPS na frente (ex.: Caddy: `seu-dominio { reverse_proxy 127.0.0.1:3000 }`). HTTPS é obrigatório para o iPhone liberar o movimento do aparelho.
 
+## Qualidade da imagem
+
+- O site mede a placa de vídeo do aparelho (biblioteca `detect-gpu`, com as tabelas servidas pelo próprio site em
+  `/benchmarks`) e escolhe uma de três versões da cena: **baixa**, **média** ou **alta**. Depois acompanha os quadros
+  por segundo: se cair abaixo de 50, desenha menos pixels; se ainda assim não bastar, passa para a versão mais leve.
+- A engrenagem no canto superior direito deixa o convidado escolher (Automática, Alta, Média, Baixa). A escolha fica
+  guardada no aparelho.
+- O que cada versão desenha está em `web/src/quality.js` (`PRESETS`).
+- Para testar: `?q=low`, `?q=medium`, `?q=high` no fim do link.
+
+## Dia e noite
+
+O céu segue o relógio de quem abre o convite: azul de dia; à noite, estrelas, estrelas cadentes e os postes acesos
+(amanhecer das 5h30 às 6h30, anoitecer das 17h30 às 18h30). Para testar: `?ceu=noite`, `?ceu=dia` ou `?hora=18`.
+
 ## Modelos 3D
 
-As cenas (castelo, jardim, caminho, salão) são geradas pelos scripts em `blender/`. Para reexportar os modelos da web
-(`web/src/models/*.glb`) depois de mexer neles:
+As cenas (castelo, jardim, caminho, postes, salão) são geradas pelos scripts em `blender/`, uma vez para cada versão
+(`garden-low.glb`, `garden.glb`, `garden-high.glb` e o mesmo para `hall`). A luz do salão é calculada pelo Blender
+(Cycles) e gravada nos vértices; o site só a mostra. Para reexportar depois de mexer nos scripts:
 
 ```bash
-sh scripts/export-models.sh          # precisa do Blender no PATH; --save também regrava blender/castelo.blend
+sh scripts/export-models.sh          # as três versões; precisa do Blender no PATH; leva uns 3 minutos
+sh scripts/export-models.sh medium   # só uma
+sh scripts/export-models.sh --save   # também regrava blender/castelo.blend
 npm run build
 ```
 
 O percurso da câmera fica em `web/src/scene/journey.js`; `CAM_TRACK` em `blender/exterior.py` repete os mesmos pontos
-para que nada (árvores, arbustos, borboletas) fique no caminho da câmera.
+para que nada (árvores, arbustos, postes, borboletas) fique no caminho da câmera.
+
+As imagens estáticas (`web/public/stills`, usadas com `?imagens`, sem WebGL ou com "reduzir movimento" ligado) são
+desenhadas pela própria cena, de dia e de noite, deitadas e em pé. Para refazê-las depois de mudar os modelos: com
+`npm run dev` e `npm run dev:web` rodando, abra um convite com `?fotos` no fim do link e espere a mensagem
+"22 imagens salvas".

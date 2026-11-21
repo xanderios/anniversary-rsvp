@@ -309,9 +309,9 @@ export async function createWorld(canvas, onProgress, { preset, night = 0 } = {}
         vec2 cell = vWorld.xz / 1.6;
         vec2 g = abs(fract(cell - 0.5) - 0.5) * 1.6;            // distance to the nearest joint, in metres
         vec2 fw = fwidth(vWorld.xz) * 0.75 + 0.0001;
-        vec2 ln = 1.0 - smoothstep(vec2(0.014) - fw, vec2(0.014) + fw, g);
-        float joint = max(ln.x, ln.y) * clamp(0.02 / max(fw.x, fw.y), 0.0, 1.0);   // fades out before it can shimmer
-        vec3 col = vCol * (1.0 - 0.1 * joint);
+        vec2 ln = 1.0 - smoothstep(vec2(0.018) - fw, vec2(0.018) + fw, g);
+        float joint = max(ln.x, ln.y) * clamp(0.03 / max(fw.x, fw.y), 0.0, 1.0);   // fades out before it can shimmer
+        vec3 col = vCol * (1.0 - 0.13 * joint);
         #ifdef MIRROR
           vec3 v = normalize(uEye - vWorld);
           float k = mix(0.16, 0.5, pow(1.0 - clamp(v.y, 0.0, 1.0), 3.0)) * (1.0 - 0.5 * joint);
@@ -551,11 +551,13 @@ export async function createWorld(canvas, onProgress, { preset, night = 0 } = {}
     return inHall;
   }
 
-  // compile shaders and draw the first shadow map before the loader lifts
+  // Compile shaders, draw the first shadow map and send both scenes to the GPU before the loader
+  // lifts: the hall is drawn once here, so walking into it later costs no long frame.
   renderer.shadowMap.needsUpdate = shadows;
   resize(true);
   frame(0, 0.016, null);
-  renderer.compile(hall, cam);
+  frame(1, 0, null);
+  frame(0, 0, null);
 
   return {
     frame, renderer, setNight,
