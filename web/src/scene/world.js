@@ -1,12 +1,13 @@
 // The 3D world: garden + castle (exterior) and the party hall (interior), both exported from
 // Blender. The garden carries colour and soft occlusion in its vertex colours and is lit live
 // (sun or moon, sky); the hall's light is baked entirely (Cycles) and is drawn unlit.
-// The sun and the moon themselves ride a wheel behind the land: half a turn swaps day and night.
+// The sun and the moon themselves are flat pictures riding a wheel behind the land: half a turn
+// swaps day and night.
 // Everything that costs frame time is scaled by a quality preset (see ../quality.js).
 import {
   AdditiveBlending, BufferGeometry, CatmullRomCurve3, Color, DirectionalLight, Float32BufferAttribute, Fog, HemisphereLight,
-  IcosahedronGeometry, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhongMaterial, Object3D, PCFShadowMap, PerspectiveCamera, PlaneGeometry,
-  PointLight, Points, Quaternion, SRGBColorSpace, Scene, ShaderMaterial, Vector3, WebGLRenderTarget, WebGLRenderer,
+  Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhongMaterial, PCFShadowMap, PerspectiveCamera, PlaneGeometry,
+  PointLight, Points, Quaternion, SRGBColorSpace, Scene, ShaderMaterial, Vector3, Vector4, WebGLRenderTarget, WebGLRenderer,
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
@@ -39,10 +40,14 @@ const LIGHT = {
 };
 
 // Where the sun (by day) and the moon (by night) rest: up and to the right of the castle, as seen
-// from the walk. BODY is their radius and HALO the reach of their glow, in radii.
-const REST = { az: 10.5, el: 11.0 };      // degrees to the right of the castle's axis, and above the horizon
-const BODY = 0.066;                       // radius, as a share of the lens (so it keeps its size on screen)
-const HALO = 3.4;
+// from the walk. Both are flat pictures: the sun a plain disc, the moon a waning crescent.
+const REST = { az: 10.5, el: 11.0 };     // degrees to the right of the castle's axis, and above the horizon
+const BODY = 0.066;                       // the sun's radius, as a share of the lens (so it keeps its size on screen)
+const MOON = 1.12;                        // the moon's radius, in suns (a crescent is slighter than a disc)
+const HALO = 3.4;                         // the reach of their glow, in radii
+// The crescent is a disc with a second disc cut out of it: SHADE is how far the cut is pushed (towards
+// the upper right, so the lit edge is the lower left one) and how large it is. Flip x to mirror the moon.
+const SHADE = { x: 0.46, y: 0.24, r: 0.93 };
 const TURN = { time: 0.6, speed: 0.17 };  // the wheel: seconds to pick up speed, and turns per second at most
 
 // `sky` is the phase the scene opens at (see sky.js): 0 = day, 0.5 = night.
@@ -150,57 +155,51 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
   ext.add(sky);
   disposables.push(skyGeo, skyMat);
 
-  // The sun and the moon: two faceted balls, each with a soft glow, at opposite ends of one wheel.
-  // They are drawn at the distance where the haze closes, so the garden, the castle and the clouds
-  // pass in front of them, and far land that has already melted into the sky stays behind.
-  const ballGeo = new IcosahedronGeometry(1, 1), haloGeo = new PlaneGeometry(2, 2);
-  disposables.push(ballGeo, haloGeo);
+  // The sun and the moon: two flat pictures that always face the camera, at opposite ends of one
+  // wheel. They are drawn at the distance where the haze closes, so the garden, the castle and the
+  // clouds pass in front of them, and far land that has already melted into the sky stays behind.
+  const bodyGeo = new PlaneGeometry(2, 2);
+  disposables.push(bodyGeo);
   const restDir = new Vector3(Math.sin(REST.az * Math.PI / 180) * Math.cos(REST.el * Math.PI / 180), Math.sin(REST.el * Math.PI / 180),
     -Math.cos(REST.az * Math.PI / 180) * Math.cos(REST.el * Math.PI / 180));
   const body = (isSun) => {
-    const uniforms = { uAlpha: { value: 1 }, uLow: { value: 0 }, uTime: time };   // uLow: 0 high in the sky, 1 down at the horizon
-    const defines = isSun ? { SUN: 1 } : {};
-    const ballMat = new ShaderMaterial({
-      uniforms, defines, transparent: true, depthWrite: false, fog: false,
-      vertexShader: 'varying vec3 vView; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vView = mv.xyz; gl_Position = projectionMatrix * mv; }',
-      fragmentShader: `uniform float uAlpha; uniform float uLow; varying vec3 vView;
-        void main(){ vec3 n = normalize(cross(dFdx(vView), dFdy(vView)));                              // one flat tone per facet
-          float k = smoothstep(-0.35, 0.95, dot(n, normalize(vec3(-0.5, 0.62, 0.6))));
-          #ifdef SUN
-            vec3 col = mix(vec3(1.0, 0.79, 0.38), vec3(1.0, 0.95, 0.70), k);
-            col = mix(col, mix(vec3(0.98, 0.52, 0.36), vec3(1.0, 0.77, 0.54), k), uLow);              // sets red
-          #else
-            vec3 col = mix(vec3(0.71, 0.76, 0.93), vec3(0.99, 0.98, 0.92), k);
-            col = mix(col, mix(vec3(0.86, 0.66, 0.62), vec3(1.0, 0.91, 0.80), k), uLow * 0.7);        // rises warm
-          #endif
-          gl_FragColor = vec4(col, uAlpha); }`,
-    });
-    const glowMat = new ShaderMaterial({
-      uniforms, defines: { ...defines, HALO: HALO.toFixed(2) }, transparent: true, depthWrite: false, fog: false,
+    const uniforms = { uAlpha: { value: 1 }, uLow: { value: 0 } };   // uLow: 0 high in the sky, 1 down at the horizon
+    const mat = new ShaderMaterial({
+      uniforms, transparent: true, depthWrite: false, fog: false,
+      defines: { HALO: HALO.toFixed(2), ...(isSun ? { SUN: 1 } : { SHADE: `vec2(${SHADE.x.toFixed(3)}, ${SHADE.y.toFixed(3)})`, SHADE_R: SHADE.r.toFixed(3) }) },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: `uniform float uAlpha; uniform float uLow; uniform float uTime; varying vec2 vUv;
-        void main(){ vec2 p = (vUv - 0.5) * 2.0 * HALO; float d = length(p);                           // d: distance in radii
-          float away = max(d - 0.9, 0.0);
+      fragmentShader: `uniform float uAlpha; uniform float uLow; varying vec2 vUv;
+        #ifndef SUN
+        // distance to a crescent: the unit disc less a disc of radius rb whose centre is c away along +x
+        float crescent(vec2 p, float c, float rb){ p.y = abs(p.y);
+          float a = (1.0 - rb * rb + c * c) / (2.0 * c), b = sqrt(max(1.0 - a * a, 0.0));              // (a, b): a horn's tip
+          if (c * (p.x * b - p.y * a) > c * c * max(b - p.y, 0.0)) return length(p - vec2(a, b));
+          return max(length(p) - 1.0, rb - length(p - vec2(c, 0.0))); }
+        #endif
+        void main(){ vec2 p = (vUv - 0.5) * 2.0 * HALO;                                                // in radii, from the centre
           #ifdef SUN
-            float rays = 0.5 + 0.5 * cos(atan(p.y, p.x) * 12.0 + uTime * 0.1); rays *= rays;
-            float glow = exp(-away * 1.9) * 0.62 + rays * exp(-away * 1.3) * 0.2;
-            vec3 col = mix(vec3(1.0, 0.96, 0.78), vec3(1.0, 0.72, 0.52), uLow);
+            float d = length(p) - 1.0;                                                                 // a disc
+            vec3 col = mix(vec3(1.0, 0.86, 0.43), vec3(1.0, 0.61, 0.38), uLow);                        // sets red
+            vec3 air = mix(vec3(1.0, 0.95, 0.72), vec3(1.0, 0.72, 0.52), uLow);
+            float glow = exp(-max(d, 0.0) * 1.9) * 0.6;
           #else
-            float glow = exp(-away * 1.6) * 0.46;
-            vec3 col = mix(vec3(0.80, 0.87, 1.0), vec3(1.0, 0.84, 0.74), uLow * 0.7);
+            vec2 axis = normalize(SHADE);
+            float d = crescent(vec2(dot(p, axis), dot(p, vec2(-axis.y, axis.x))), length(SHADE), SHADE_R);
+            vec3 col = mix(vec3(0.99, 0.97, 0.88), vec3(1.0, 0.89, 0.76), uLow * 0.7);                 // rises warm
+            vec3 air = mix(vec3(0.80, 0.87, 1.0), vec3(1.0, 0.84, 0.74), uLow * 0.7);
+            float glow = exp(-max(d, 0.0) * 2.1) * 0.42;
           #endif
-          float a = glow * smoothstep(HALO, HALO * 0.6, d) * uAlpha; if (a < 0.003) discard;
-          gl_FragColor = vec4(col, a); }`,
+          float w = fwidth(d), fill = 1.0 - smoothstep(-w, w, d);
+          glow *= smoothstep(HALO, HALO * 0.6, length(p));
+          float a = mix(glow, 1.0, fill) * uAlpha; if (a < 0.003) discard;
+          gl_FragColor = vec4(mix(air, col, fill), a); }`,
     });
-    disposables.push(ballMat, glowMat);
-    const ball = new Mesh(ballGeo, ballMat), halo = new Mesh(haloGeo, glowMat), root = new Object3D();
-    halo.scale.setScalar(HALO);
-    halo.renderOrder = -50; ball.renderOrder = -49;   // after the stars, before everything else that glows
-    ball.frustumCulled = halo.frustumCulled = false;
-    ball.rotation.set(0.4, isSun ? 0.3 : 2.1, 0.2);
-    root.add(halo, ball);
+    disposables.push(mat);
+    const root = new Mesh(bodyGeo, mat);
+    root.renderOrder = -50;                           // after the stars, before everything else that glows
+    root.frustumCulled = false;
     ext.add(root);
-    return { root, ball, halo, uniforms, dir: new Vector3(), x: 0, y: 0, lag: isSun ? 0 : 0.5 };
+    return { root, uniforms, size: isSun ? 1 : MOON, dir: new Vector3(), x: 0, y: 0, lag: isSun ? 0 : 0.5 };
   };
   const bodies = [body(true), body(false)];
   let bodyFar = 100;
@@ -263,10 +262,12 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
 
   // night sky: stars over the whole horizon, and now and then a shooting star
   const starMat = new ShaderMaterial({
-    uniforms: { uTime: time, uSize: { value: 1 }, uNight: { value: 0 } }, transparent: true, depthWrite: false, blending: AdditiveBlending,
-    vertexShader: `attribute vec2 aRnd; uniform float uTime; uniform float uSize; varying float vA; varying float vTint;
+    uniforms: { uTime: time, uSize: { value: 1 }, uNight: { value: 0 }, uMoon: { value: new Vector4(0, 1, 0, 2) } }, transparent: true, depthWrite: false, blending: AdditiveBlending,
+    vertexShader: `attribute vec2 aRnd; uniform float uTime; uniform float uSize; uniform vec4 uMoon; varying float vA; varying float vTint;
       void main(){ vA = 0.55 + 0.45 * sin(uTime * (0.5 + aRnd.x * 1.6) + aRnd.y * 50.0); vTint = aRnd.y;
-        vA *= smoothstep(0.03, 0.22, normalize(position - cameraPosition).y);                        // none in the haze of the horizon
+        vec3 to = normalize(position - cameraPosition);
+        vA *= smoothstep(0.03, 0.22, to.y);                                                          // none in the haze of the horizon
+        vA *= step(dot(to, uMoon.xyz), uMoon.w);                                                     // none across the moon's dark side
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = uSize * (1.6 + aRnd.x * aRnd.x * 3.4); }`,
     fragmentShader: `uniform float uNight; varying float vA; varying float vTint; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0;
         float a = smoothstep(1.0, 0.15, d) * vA * uNight; if (a < 0.01) discard;
@@ -574,7 +575,7 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
       if (!b.root.visible) continue;
       b.x = A * Math.sin(a); b.y = cy + B * c;
       b.dir.copy(fwd).addScaledVector(right, b.x).addScaledVector(up, b.y).normalize();
-      b.root.scale.setScalar(bodyFar * r);
+      b.root.scale.setScalar(bodyFar * r * b.size * HALO);
       b.uniforms.uAlpha.value = show;
       b.uniforms.uLow.value = 1 - smooth(span(c, [0.05, 0.9 * high]));
     }
@@ -669,9 +670,11 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
         // looking around: they drift a little with the far clouds, but never as far as out of the picture
         b.dir.lerp(fwd.set(b.x, b.y, -1).normalize().applyQuaternion(cam.quaternion), 0.6).normalize();
         b.root.position.copy(cam.position).addScaledVector(b.dir, bodyFar);
-        b.halo.quaternion.copy(cam.quaternion);
-        b.ball.rotation.y += dt * 0.07;
+        b.root.quaternion.copy(cam.quaternion);
       }
+      const moon = bodies[1], disc = moon.root.scale.x / HALO / bodyFar;   // the moon's radius, as a tangent
+      if (moon.root.visible) starMat.uniforms.uMoon.value.set(moon.dir.x, moon.dir.y, moon.dir.z, 1 / Math.sqrt(1 + disc * disc));
+      else starMat.uniforms.uMoon.value.w = 2;
       skyMat.uniforms.uInvProj.value.copy(cam.projectionMatrixInverse);
       renderer.render(ext, cam);
     } else {
