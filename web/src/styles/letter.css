@@ -2,14 +2,17 @@
    Sizes: --ew is the envelope's width and --W the letter's; the letter is --R times as tall as
    it is wide (letter.js measures the text and sets --R). Inside the envelope 1em = 1/78 of its
    width; inside the letter 1em = 1% of its width. */
-/* The veil dims and blurs the hall behind the envelope. While the envelope rides the scroll, letter.js
-   sets its opacity frame by frame (no transition); once the seal is broken it stays (.on). */
+/* The veil dims and blurs the hall behind the envelope. It rides the scroll with the envelope:
+   letter.js sets its opacity frame by frame (no transition). */
 #veil { position: fixed; inset: 0; z-index: 4; pointer-events: none; background: rgba(120, 70, 78, .3); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); opacity: 0; }
-#veil.on { opacity: 1; transition: opacity .5s ease; }
 body.q-low #veil { background: rgba(108, 62, 72, .44); backdrop-filter: none; -webkit-backdrop-filter: none; }
 
-#stage { z-index: 5; pointer-events: none; overflow: hidden; outline: none; }
-.lt { position: relative; width: 100%; height: 100%; font-size: var(--u); pointer-events: none;
+/* The stage is always laid out, so its height is part of the scroll from the start; its first screen
+   holds the envelope and the letter, and the rest follows under it. */
+#stage { position: sticky; top: 0; z-index: 5; pointer-events: none; overflow: hidden; overflow: clip; outline: none; }
+#stage.fora { visibility: hidden; }
+.lt { position: relative; width: 100%; min-height: calc(var(--dvh) * 100); font-size: var(--u); pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; padding: calc(var(--st) + var(--W) * var(--R) + var(--gap)) 20px 0;
   --R: 2.05;
   --W: min(94vw, max(400px, min(560px, calc((var(--dvh) * 100 - 250px) / var(--R)))));
   --ew: min(90vw, calc(var(--dvh) * 58), 720px);
@@ -24,7 +27,8 @@ body.q-low #veil { background: rgba(108, 62, 72, .44); backdrop-filter: none; -w
 .lt:not(.open) .lt-sheet, .lt:not(.open) .lt-sheet a { pointer-events: none; }
 
 /* ---- envelope: back (inside + open flap) behind the letter, front (pocket, closed flap, seal) before it */
-.lt-env { position: absolute; left: calc(50% - var(--ew) / 2); width: var(--ew); height: calc(var(--ew) * .69); bottom: max(17%, 96px); font-size: calc(var(--ew) / 78); }
+.lt-env { position: absolute; left: calc(50% - var(--ew) / 2); width: var(--ew); height: calc(var(--ew) * .69); font-size: calc(var(--ew) / 78);
+  top: calc(var(--dvh) * 100 - max(var(--dvh) * 17, 96px) - var(--ew) * .69); }   /* its foot 17% above the first screen's bottom */
 .lt-envb { z-index: 1; } .lt-envf { z-index: 3; }
 .lt-defs { position: absolute; }
 .lt-inside { position: absolute; inset: 0; border-radius: .9em; background: linear-gradient(180deg, #DCBDB0, #EBD2C6 62%); box-shadow: 0 3em 5em -2.5em rgba(80, 35, 45, .75), 0 .5em 1.2em -.4em rgba(80, 35, 45, .45); }
@@ -57,8 +61,12 @@ body.q-low .lt-seal .wx-shadow { display: inline; }
 @keyframes selo { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.055); } }
 @media (hover: hover) { .lt:not(.opening) .lt-seal:hover svg { filter: brightness(1.07); } }
 
-.lt-open { position: absolute; left: 0; right: 0; margin: 0 auto; width: min(86vw, 400px); bottom: max(4.5%, calc(env(safe-area-inset-bottom, 0px) + 12px)); z-index: 5; }
-.lt-open .btn, .rsvp .btn { font-size: clamp(14px, calc(var(--u) * 4), 19px); padding: 1.05em .6em 1em; }
+/* under the envelope: the hint that the scroll opens it (a button as well: it scrolls the opening through) */
+.lt-open { position: absolute; left: 0; right: 0; height: 0; top: calc(var(--dvh) * 100 - max(var(--dvh) * 4.5, env(safe-area-inset-bottom, 0px) + 12px)); z-index: 5; display: flex; justify-content: center; align-items: flex-end; }
+.lt-open .chip { display: inline-flex; align-items: center; gap: .45em; white-space: nowrap; font-size: clamp(17px, calc(var(--u) * 4.7), 20px); padding: .62em 1em .64em 1.3em;
+  box-shadow: inset 0 0 0 1px var(--gold-hi), 0 10px 24px -10px rgba(80, 35, 45, .75); }
+.lt-open .chip svg { width: 1.25em; height: 1.25em; color: var(--gold-ink); animation: nudge 1.6s ease-in-out infinite; }
+.rsvp .btn { font-size: clamp(14px, calc(var(--u) * 4), 19px); padding: 1.05em .6em 1em; }
 
 /* ---- the letter: three panels, each showing its own third */
 .lt-sheet { position: absolute; left: calc(50% - var(--W) / 2); top: var(--st); width: var(--W); height: calc(var(--W) * var(--R)); font-size: calc(var(--W) / 100); z-index: 2; transform-origin: 50% 0; outline: none; }
@@ -83,12 +91,11 @@ body.q-low .lt-seal .wx-shadow { display: inline; }
 .lt.open .lt-sheet::after { opacity: 1; }
 body.q-low .lt-sheet::after { box-shadow: 0 1.4em 2em -1.2em rgba(80, 35, 45, .55); }
 
-/* ---- once open, the stage is a page that scrolls: the letter stays put and the answer follows it */
-body.page #stage { overflow: hidden auto; pointer-events: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-body.page #stage::-webkit-scrollbar { display: none; }
-body.page.modal-open #stage { overflow: hidden; }
-body.page .lt { height: auto; pointer-events: auto; display: flex; flex-direction: column; align-items: center;
-  padding: calc(var(--st) + var(--W) * var(--R) + var(--gap)) 20px 0; }
+/* ---- under the letter: the answer, then the rest of the page (page.css). None of it is there
+   until the letter lies open, and it leaves again when the letter folds back. */
+.rsvp, .pg-sec { opacity: 0; visibility: hidden; transition: opacity .4s ease, visibility 0s linear .4s; }
+#stage.aberto .rsvp, #stage.aberto .pg-sec { opacity: 1; visibility: visible; transition: opacity .7s ease .1s; }
+.ans, .pg-card { pointer-events: auto; }
 
 .rsvp { width: min(100%, 400px); }
 .rsvp[data-mode='resposta'], .rsvp[data-mode='mudar'] { width: min(100%, 480px); }
@@ -115,5 +122,6 @@ body.page .lt { height: auto; pointer-events: auto; display: flex; flex-directio
 @keyframes subir { from { transform: translate(0, 0) rotate(0deg); opacity: 1; } 85% { opacity: 1; } to { transform: translate(var(--x), -125vh) rotate(var(--r)); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .lt.on .lt-seal svg { animation: none; }
+  .lt.on .lt-seal svg, .lt-open .chip svg { animation: none; }
+  .rsvp, .pg-sec, #stage.aberto .rsvp, #stage.aberto .pg-sec { transition: none; }
 }

@@ -21,6 +21,13 @@ npm start                 # http://localhost:3000 (ou a PORT do .env)
   Opcionais, para a página que aparece depois da carta: `contato.whatsapp` (só dígitos, com DDI: botão "Falar no WhatsApp") e
   `presentes` (`itens`: lista de `{ "nome", "obs", "url" }`; `pix`: chave PIX) para as sugestões de presente. Sem um campo,
   a parte correspondente some. Os valores que estão lá são exemplos: troque antes de enviar os convites.
+- O convite inteiro é uma rolagem só: o passeio pelo jardim, o salão, o envelope que sobe, o selo que se rompe, a carta
+  que sai e se desdobra e, depois dela, a resposta, os presentes e a despedida. Rolar para cima desfaz tudo, até o
+  jardim. O selo e o aviso "Role para abrir o convite" também são botões (rolam a abertura sozinhos), e "Pular para o
+  convite" leva até o envelope ainda fechado. O tamanho de cada trecho está em `web/src/scene/journey.js`
+  (`TAIL_SCREENS`, `OPEN_SCREENS`, `ENVELOPE`, `OPENING`). Com "reduzir movimento" ligado, a carta só tem dois estados:
+  fechada e aberta.
+- A última linha da página é o crédito "Feito por xanderios" (`CREDITO` em `web/src/ui/page.js`).
 - `?imagens` no fim do link força a versão com imagens estáticas (sem 3D).
 
 ## Segurança

@@ -26,11 +26,17 @@ export const GATE_ANGLE = (105 * Math.PI) / 180;
 export const FADE_IN = [0.84, 0.9];      // cream glow rises
 export const SWAP = 0.9;                 // garden -> hall behind the glow
 export const FADE_OUT = [0.9, 0.95];
-// After the walk ends in the hall the scroll goes on for a while: first the hall alone, to look at,
-// then the envelope rides the scroll up from below (and back down, scrolling up).
-export const TAIL_SCREENS = 1;           // that extra scroll, in screen heights
-export const REACH = 1 + TAIL_SCREENS / (TRACK_SCREENS - 1);   // the very end of the scroll, in journeys (1 = the walk's end)
+// After the walk ends in the hall the scroll goes on: the hall alone at first, to look at, then the
+// envelope rides the scroll up from below, then the same scroll breaks the seal, opens the flap and
+// unfolds the letter. From there on the page itself scrolls (the answer, the gifts, the goodbye).
+// Scrolling up plays all of it backwards, out to the garden again.
+const WALK = TRACK_SCREENS - 1;          // screens of scroll in one journey (0 to 1)
+export const TAIL_SCREENS = 1;           // the hall and the envelope's arrival, in screen heights
+export const OPEN_SCREENS = 3;           // the opening: seal, flap, the letter out and unfolded
+export const REACH = 1 + TAIL_SCREENS / WALK;         // the envelope is in place (where "skip" stops), in journeys
+export const OPENED = REACH + OPEN_SCREENS / WALK;    // the letter lies open: here the pinned scroll ends and the page moves
 export const ENVELOPE = [1.025, 1.105];  // the envelope: still below the screen, in place (in journeys)
+export const OPENING = [REACH + 0.22 / WALK, OPENED - 0.12 / WALK];   // the opening, with a short rest at each end
 // what the little indicator says while the "skip" ride crosses the garden
 export const CAPTIONS = [
   [0.03, 'Seguindo o caminho até o castelo…'],

@@ -3,16 +3,19 @@
 @import './letter.css';
 @import './page.css';
 
-/* The page is one tall scroll track; everything visible is pinned to the screen. */
+/* The page is one tall scroll. The scenery is pinned to the screen; the stage (envelope, letter and
+   what follows it) is pinned too while the track lasts, and scrolls like any page after it: it is
+   `sticky` and comes first in the flow, so it holds its place until the track under it runs out. */
 html, body.guest { background: var(--sky-bottom); }
 body.guest { overscroll-behavior-y: none; }
 /* no scrollbar on the invitation (the rail on the right shows the way): nothing shifts sideways when the page locks */
 html.convite { scrollbar-width: none; }
 html.convite::-webkit-scrollbar { display: none; }
-body.locked { overflow: hidden; }
+html.convite { overflow-anchor: none; }
+body.locked, body.modal-open { overflow: hidden; }
 .sprite { position: absolute; }
-#track { height: 1050vh; }
-#sky, #gl, #stills, #fade, #hud, #stage, #loader { position: fixed; inset: 0; }
+#track { height: 1250vh; }
+#sky, #gl, #stills, #fade, #hud, #loader { position: fixed; inset: 0; }
 #sky { background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom)); transition: background-color .2s; z-index: 0; }
 body.in-hall #sky { background: var(--hall); }
 #gl { width: 100%; height: 100%; display: block; z-index: 1; touch-action: pan-y; }

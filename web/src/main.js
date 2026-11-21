@@ -1,5 +1,5 @@
 import './styles/app.css';
-import { CAPTIONS, ENVELOPE, FADE_OUT, REACH, SWAP, TAIL_SCREENS, TRACK_SCREENS, fadeAt, span } from './scene/journey.js';
+import { CAPTIONS, ENVELOPE, FADE_OUT, OPENED, OPENING, REACH, SWAP, TRACK_SCREENS, fadeAt, span } from './scene/journey.js';
 import { createTilt } from './ui/tilt.js';
 import { createLetter } from './ui/letter.js';
 import './styles/scene.css';
@@ -208,29 +208,28 @@ async function start() {
     desenhar();
   }
 
-  // ---- envelope + invitation
-  let aberto = false;
-  const letter = createLetter($('stage'), dados, {
-    token,
-    onOpen() { aberto = true; document.body.classList.add('locked'); hud(false); },
-  });
-
-  // ---- scroll -> progress
+  // ---- scroll -> progress. One scroll carries the whole visit: the walk, the hall, the envelope, its
+  // opening, and then the page under the letter. The track is the pinned stretch (up to the open letter).
   const track = $('track'), guide = $('guide'), hint = $('hint'), skip = $('skip'), caption = $('caption'), rail = $('rail'), dot = rail.firstElementChild, fade = $('fade'), cue = $('cue');
-  const medir = () => { track.style.height = Math.round(innerHeight * (TRACK_SCREENS + TAIL_SCREENS)) + 'px'; };
+  let unidade = 1;                             // pixels of scroll in one journey (0 to 1)
+  const medir = () => { unidade = Math.round(innerHeight * (TRACK_SCREENS - 1)); track.style.height = Math.round(unidade * OPENED) + 'px'; };
   medir();
   let largura = innerWidth;
-  addEventListener('resize', () => { if (innerWidth !== largura) { largura = innerWidth; medir(); } }); // ignore mobile URL-bar resizes
+  addEventListener('resize', () => {           // ignore mobile URL-bar resizes; on a real one, stay at the same moment
+    if (innerWidth === largura) return;
+    largura = innerWidth;
+    const antes = unidade, fimAntes = track.offsetHeight, y = scrollY;
+    medir();
+    scrollTo(0, y <= fimAntes ? (y * unidade) / antes : track.offsetHeight + (y - fimAntes));
+  });
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   scrollTo(0, 0);
 
-  const fundo = () => document.documentElement.scrollHeight - innerHeight;
-  // how far the scroll has come, in journeys: 1 is the walk's end in the hall, REACH the very bottom
-  const alvo = () => {
-    const max = fundo();
-    return max > 0 ? Math.min(1, Math.max(0, scrollY / max)) * REACH : 0;
-  };
-  function hud(on) { [guide, rail].forEach((el) => el.classList.toggle('gone', !on)); if (!on) { intro.style.visibility = 'hidden'; cue.classList.add('gone'); } }
+  // how far the scroll has come, in journeys: 1 is the walk's end in the hall, OPENED the open letter
+  const alvo = () => Math.max(0, scrollY) / unidade;
+
+  // ---- envelope + invitation (the seal and the hint under it are buttons: they scroll the opening through)
+  const letter = createLetter($('stage'), dados, { token, onRide: () => passear(track.offsetHeight, 1700) });
 
   // "skip" rests on the hint; once the hint sinks away it slides down into the hint's place
   const pill = hint.firstElementChild;
@@ -246,28 +245,32 @@ async function start() {
   document.fonts?.ready.then(() => { dispatchEvent(new Event('resize')); });
 
   // ---- the ride: one smooth crossing of the whole journey, as in a guided tour
-  let passeio = 0, passeando = false, legenda = '';
+  let passeio = 0, passeando = false, chegando = false, legenda = '';
   function parar() {
     if (!passeando) return;
     cancelAnimationFrame(passeio);
     passeando = false;
     guide.classList.remove('riding');
   }
-  skip.addEventListener('click', () => {
-    const de = scrollY, dist = fundo() - de;
-    if (dist < 2) return;
-    // about 1.3 s per screen of distance; the whole crossing takes some 11 s
-    const dur = calmo ? 1 : Math.min(11000, Math.max(700, (dist / innerHeight) * 1300)), t0 = performance.now();
+  // scrolls to `ate` at an even pace (`porTela` ms for each screen of distance), soft at both ends
+  function passear(ate, porTela = 1300) {
+    const de = scrollY, dist = ate - de;
+    if (Math.abs(dist) < 2) return;
+    // the whole crossing of the garden takes some 11 s
+    const dur = calmo ? 1 : Math.min(11000, Math.max(700, (Math.abs(dist) / innerHeight) * porTela)), t0 = performance.now();
     cancelAnimationFrame(passeio);
     passeando = true;
+    chegando = false;
     guide.classList.add('riding');
     const passo = (t) => {
       const f = Math.min(1, (t - t0) / dur), sio = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
-      scrollTo(0, de + dist * (0.35 * sio + 0.65 * f)); // nearly even pace, soft at both ends
+      scrollTo(0, de + dist * (0.35 * sio + 0.65 * f));
       if (f < 1) passeio = requestAnimationFrame(passo);
+      else chegando = true;                    // the loop ends the ride once the scene has caught up
     };
     passeio = requestAnimationFrame(passo);
-  });
+  }
+  skip.addEventListener('click', () => passear(unidade * REACH));   // as far as the envelope, in place and still sealed
   ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach((evn) => addEventListener(evn, (e) => { if (!skip.contains(e.target)) parar(); }, { passive: true }));
 
   const suave = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
@@ -277,11 +280,16 @@ async function start() {
     const real = (agora - antes) / 1000, dt = Math.min(0.05, real);
     antes = agora;
     governor.tick(real);
-    const a = aberto ? REACH : alvo(); // once the letter is open the journey stays in the hall
+    const a = alvo();
     x += (a - x) * (1 - Math.exp(-dt * (calmo ? 30 : 5)));
     if (Math.abs(a - x) < 0.0004) x = a;
     p = Math.min(1, x);
 
+    // in the hall the scroll goes on: the hall alone at first, then the envelope rides it up from below,
+    // then it opens the envelope and unfolds the letter; past that the page itself scrolls
+    const env = span(x, ENVELOPE);
+    letter.enter(env);
+    letter.unfold(span(x, OPENING));
     const page = letter.tick(dt); // 0 until the letter is open, then the open page's scroll progress, 0 (top) to 1 (bottom)
     const noSalao = world.frame(p, dt, tilt.state, page);
     pagina = page;
@@ -292,35 +300,29 @@ async function start() {
     if (noSalao !== salao) { salao = noSalao; document.body.classList.toggle('in-hall', salao); }
     fade.style.opacity = fadeAt(p).toFixed(3);
 
-    if (!aberto) {
-      // the opening card opens the way: it lifts and fades over the first three quarters of a screen
-      const hp = suave(Math.min(1, Math.max(0, scrollY / (innerHeight * 0.75))));
-      if (hp !== some) {
-        some = hp;
-        card.style.transform = hp ? `translateY(${(-70 * hp).toFixed(1)}px) scale(${(1 - 0.12 * hp).toFixed(4)})` : '';
-        card.style.opacity = Math.max(0, 1 - hp * 1.6).toFixed(3);
-        intro.style.visibility = hp >= 0.63 ? 'hidden' : '';
-      }
-      guide.classList.toggle('moving', p > 0.012 || passeando);
-      guide.classList.toggle('gone', p >= SWAP - 0.02);
-      const meio = p > 0.02 && p < SWAP;
-      rail.classList.toggle('gone', !meio);
-      dot.style.top = (p * 100).toFixed(1) + '%';
-
-      let texto = '';
-      if (passeando && !calmo) for (const [de, t] of CAPTIONS) if (p >= de) texto = t;
-      if (texto !== legenda) {
-        legenda = texto;
-        if (texto) caption.textContent = texto;
-        caption.classList.toggle('show', !!texto);
-      }
-      if (passeando && a >= REACH && x >= REACH - 0.001) parar();
-
-      // in the hall the scroll goes on: the hall alone at first, then the envelope rides it up from below
-      const env = span(x, ENVELOPE);
-      letter.enter(env);
-      cue.classList.toggle('gone', passeando || p < FADE_OUT[1] - 0.012 || env > 0.12);
+    // the opening card opens the way: it lifts and fades over the first three quarters of a screen
+    const hp = suave(Math.min(1, Math.max(0, scrollY / (innerHeight * 0.75))));
+    if (hp !== some) {
+      some = hp;
+      card.style.transform = hp ? `translateY(${(-70 * hp).toFixed(1)}px) scale(${(1 - 0.12 * hp).toFixed(4)})` : '';
+      card.style.opacity = Math.max(0, 1 - hp * 1.6).toFixed(3);
+      intro.style.visibility = hp >= 0.63 ? 'hidden' : '';
     }
+    guide.classList.toggle('moving', p > 0.012 || passeando);
+    guide.classList.toggle('gone', p >= SWAP - 0.02);
+    const meio = p > 0.02 && p < SWAP;
+    rail.classList.toggle('gone', !meio);
+    dot.style.top = (p * 100).toFixed(1) + '%';
+
+    let texto = '';
+    if (passeando && !calmo) for (const [de, t] of CAPTIONS) if (p >= de) texto = t;
+    if (texto !== legenda) {
+      legenda = texto;
+      if (texto) caption.textContent = texto;
+      caption.classList.toggle('show', !!texto);
+    }
+    if (passeando && chegando && x === a) parar();
+    cue.classList.toggle('gone', passeando || p < FADE_OUT[1] - 0.012 || env > 0.12);
     requestAnimationFrame(loop);
   }
 

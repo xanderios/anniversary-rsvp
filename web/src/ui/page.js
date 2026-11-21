@@ -1,7 +1,8 @@
-// The page the invitation becomes once the letter is open: the stage turns into a normal
-// vertical scroll (letter, gift ideas, goodbye) over the hall, with a few layers that drift at
-// different speeds. Only `transform` and `opacity` change while scrolling; every measurement is
-// cached, so a frame never forces layout.
+// The page the invitation becomes once the letter is open: the same scroll that walked the garden
+// and opened the envelope goes on down the page (letter, answer, gift ideas, goodbye, credit) over the
+// hall, with a few layers that drift at different speeds. The stage is pinned to the screen until
+// the letter lies open and scrolls like any page from there on (see letter.css). Only `transform`
+// and `opacity` change while scrolling; every measurement is cached, so a frame never forces layout.
 import { h, icone, calmo } from './dom.js';
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -13,6 +14,7 @@ const PETALAS = [
   [45, 0.78, 13, 0.45, 15, 1, 0.6], [94, 0.86, 22, 1.5, 80, 0, 0.7], [3, 0.95, 28, 1.1, -70, 2, 0.75], [62, 0.34, 12, 1.7, 30, 3, 0.6],
 ];
 const CORES = ['#F6B8C2', '#FBE9E0', '#F7C2CB', '#F2D9A0'];
+const CREDITO = 'https://xanderios.vercel.app/';
 
 export function createPage(stage, dados) {
   const ev = dados.evento || {};
@@ -23,7 +25,7 @@ export function createPage(stage, dados) {
 
   // ---- sections (all text set as text)
   const btnIdeias = temIdeias ? h('button', { class: 'btn pri', type: 'button', 'aria-haspopup': 'dialog', text: 'Ver sugestões de presente' }) : null;
-  const presentes = h('section', { class: 'pg-sec pg-gifts', 'aria-labelledby': 'pg-gifts-t', hidden: true },
+  const presentes = h('section', { class: 'pg-sec pg-gifts', 'aria-labelledby': 'pg-gifts-t' },
     h('div', { class: 'pg-float' },
       h('div', { class: 'pg-card rv' },
         h('div', { class: 'pg-orn pg-bow' }, icone('bow')),
@@ -32,14 +34,17 @@ export function createPage(stage, dados) {
         btnIdeias)));
 
   const zapUrl = zap ? `https://wa.me/${zap}?text=${encodeURIComponent(`Oi! Estou com uma dúvida sobre a festa da ${ev.nome || 'princesa'} 👑`)}` : '';
-  const fim = h('footer', { class: 'pg-sec pg-end', hidden: true },
+  const fim = h('footer', { class: 'pg-sec pg-end' },
     h('div', { class: 'pg-float' },
       h('div', { class: 'pg-card rv' },
         h('div', { class: 'pg-orn pg-flo' }, icone('flourish')),
         h('p', { class: 'pg-script', text: 'Com amor, papai e mamãe' }),
         h('p', { class: 'pg-it', text: 'Qualquer dúvida, é só chamar a gente.' }),
-        zapUrl && h('a', { class: 'btn sec pg-wa', href: zapUrl, target: '_blank', rel: 'noopener noreferrer' }, icone('wa'), h('span', { text: 'Falar no WhatsApp' })))));
+        zapUrl && h('a', { class: 'btn sec pg-wa', href: zapUrl, target: '_blank', rel: 'noopener noreferrer' }, icone('wa'), h('span', { text: 'Falar no WhatsApp' })))),
+    // the very last line of the page: who made it
+    h('p', { class: 'pg-credit' }, 'Feito por ', h('a', { href: CREDITO, target: '_blank', rel: 'noopener noreferrer', text: 'xanderios' })));
   stage.append(presentes, fim);
+  const track = document.getElementById('track');   // the pinned stretch of scroll before the page moves
 
   // ---- little things pinned to the screen: scroll cue, progress rail, toast, petals
   const cue = h('button', { class: 'chip pg-cue', type: 'button', hidden: true }, h('span', { text: 'Role para ver mais' }), icone('chev'));
@@ -130,15 +135,17 @@ export function createPage(stage, dados) {
   btnIdeias?.addEventListener('click', abrirModal);
 
   // ---- scrolling state (everything a frame needs is cached here)
-  let ligado = false, topo = 0, max = 0, vh = 0, railH = 0, laco = 0;
+  let ligado = false, pronto = false, base = 0, topo = 0, max = 0, vh = 0, railH = 0, laco = 0;   // base: where the page's own scroll begins
   let y = 0, pg = 0, yAntes = -1, pgAntes = -1;
   const flutuam = [...stage.querySelectorAll('.pg-float')].map((el) => ({ el, orn: el.querySelector('.pg-orn'), meio: 0 }));
+  const rolado = () => clamp(scrollY - base, 0, max);
 
   function medir() {
-    if (!ligado) return;
-    vh = stage.clientHeight;
-    max = Math.max(0, stage.scrollHeight - vh);
-    topo = stage.scrollTop;
+    if (!pronto) return;
+    vh = innerHeight;
+    base = track.offsetHeight;
+    max = Math.max(0, stage.offsetHeight - vh);
+    topo = rolado();
     railH = rail.clientHeight;
     laco = vh + 240;
     for (const f of flutuam) f.meio = f.el.parentElement.offsetTop + f.el.offsetTop + f.el.offsetHeight / 2;
@@ -148,31 +155,25 @@ export function createPage(stage, dados) {
 
   function irPara(el, folga = 24) {
     if (!ligado || !el) return;
-    const r = el.getBoundingClientRect(), s = stage.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
     // bring the whole block into view; if it is taller than the screen, its top
-    const alvo = r.height + folga * 2 > s.height ? stage.scrollTop + r.top - s.top - folga : stage.scrollTop + r.bottom - s.bottom + folga;
-    stage.scrollTo({ top: clamp(alvo, 0, stage.scrollHeight), behavior: calmo() ? 'auto' : 'smooth' });
+    const alvo = r.height + folga * 2 > innerHeight ? scrollY + r.top - folga : scrollY + r.bottom - innerHeight + folga;
+    scrollTo({ top: clamp(alvo, base, base + max), behavior: calmo() ? 'auto' : 'smooth' });   // never back into the opening
   }
-  const visivel = (el) => { const r = el.getBoundingClientRect(), s = stage.getBoundingClientRect(); return r.bottom <= s.bottom - 8 && r.top >= s.top; };
+  const visivel = (el) => { const r = el.getBoundingClientRect(); return r.bottom <= innerHeight - 8 && r.top >= 0; };
 
-  let cueAlvo = null;
+  let cueAlvo = null, cueTimer = 0;
   function esconderCue() {
+    clearTimeout(cueTimer);
     if (cue.hidden || !cue.classList.contains('on')) return;
     cue.classList.remove('on');
-    setTimeout(() => { cue.hidden = true; }, 450);
+    setTimeout(() => { if (!cue.classList.contains('on')) cue.hidden = true; }, 450);
   }
   cue.addEventListener('click', () => { irPara(cueAlvo || presentes); esconderCue(); });
 
-  // Called once, when the letter has finished unfolding. `alvo` is the block right under the
-  // letter (the answer buttons); `texto` is what the cue says when that block is off screen.
-  function start({ alvo, texto } = {}) {
-    if (ligado) return;
-    ligado = true;
-    presentes.hidden = fim.hidden = false;
-    document.body.classList.add('page');
-    stage.tabIndex = -1;
-    stage.scrollTop = 0;
-
+  // The first time the letter lies open: petals, listeners, and the sections' arrival.
+  function preparar() {
+    pronto = true;
     if (!calmo()) {
       for (const [x, y0, s, prof, giro, cor, op] of PETALAS) {
         const el = h('i', { style: `left:${x}%` }, h('b', { style: `width:${s}px;height:${s}px;background:${CORES[cor]};opacity:${op};--r:${giro}deg;--t:${(5 + prof * 3).toFixed(1)}s` }));
@@ -181,33 +182,45 @@ export function createPage(stage, dados) {
       }
     }
 
-    stage.addEventListener('scroll', () => { topo = stage.scrollTop; if (topo > 24) esconderCue(); }, { passive: true });
+    addEventListener('scroll', () => { topo = rolado(); if (topo > 24) esconderCue(); }, { passive: true });
     addEventListener('resize', medir);
     if ('ResizeObserver' in window) {
       const ro = new ResizeObserver(medir);
-      [...stage.children].forEach((el) => ro.observe(el));
+      [track, ...stage.children].forEach((el) => ro.observe(el));
     }
-    medir();
 
     // sections arrive as they scroll into view
     const rv = [...stage.querySelectorAll('.rv')];
     if ('IntersectionObserver' in window && !calmo()) {
-      const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { root: stage, threshold: 0.18, rootMargin: '0px 0px -6% 0px' });
+      const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.18, rootMargin: '0px 0px -6% 0px' });
       rv.forEach((el) => io.observe(el));
     } else rv.forEach((el) => el.classList.add('in'));
+  }
+
+  // Called whenever the letter comes to lie open (on = true) or starts folding back (on = false).
+  // `alvo` is the block right under the letter (the answer buttons); `texto` is what the cue says
+  // when that block is off screen.
+  function show(on, { alvo, texto } = {}) {
+    if (on === ligado) return;
+    ligado = on;
+    document.body.classList.toggle('page', on);
+    if (!on) { esconderCue(); return; }
+    if (!pronto) preparar();
+    medir();
 
     cueAlvo = alvo || null;
+    clearTimeout(cueTimer);
     if (max > 8 && (!alvo || !visivel(alvo))) {
       if (alvo && texto) cue.firstElementChild.textContent = texto;
-      cue.hidden = false;
-      setTimeout(() => { if (topo <= 24) cue.classList.add('on'); else cue.hidden = true; }, 1300); // the whole letter is seen first
+      // the whole letter is seen first
+      cueTimer = setTimeout(() => { if (!ligado || topo > 24) return; cue.hidden = false; void cue.offsetWidth; cue.classList.add('on'); }, 1100);
     }
   }
 
   // One step of the main loop. Returns the page's scroll progress, 0 (top) to 1 (bottom),
-  // eased like the journey's own progress; 0 until the page has started.
+  // eased like the journey's own progress; 0 until the letter has been open once.
   function tick(dt) {
-    if (!ligado) return 0;
+    if (!pronto) return 0;
     const quieto = calmo();
     const alvo = max > 0 ? clamp(topo / max, 0, 1) : 0;
     pg += (alvo - pg) * (1 - Math.exp(-dt * (quieto ? 30 : 5)));
@@ -235,5 +248,5 @@ export function createPage(stage, dados) {
     return pg;
   }
 
-  return { start, tick, medir, irPara, toast, get ligado() { return ligado; } };
+  return { show, tick, medir, irPara, toast, get ligado() { return ligado; } };
 }

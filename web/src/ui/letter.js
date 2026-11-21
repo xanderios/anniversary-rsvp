@@ -1,4 +1,5 @@
-// Envelope rides the scroll in -> wax seal drops -> flap opens -> letter rises -> unfolds -> the page scrolls.
+// One scroll does it all: the envelope rides in -> the wax seal drops -> the flap opens -> the letter
+// rises and unfolds -> the page scrolls on. Scrolling up plays it backwards.
 // Layers, front to back: envelope pocket + closed flap + seal, the letter, envelope back + open flap.
 import { buildInvite, inviteText, startCountdown } from './invite.js';
 import { createPage } from './page.js';
@@ -78,7 +79,7 @@ const ABA_DENTRO = `
     <path d="M22,10H758V17Q758,26 750,32L404,285Q390,295 376,285L30,32Q22,26 22,17Z" fill="url(#env-forro)"/>
   </svg>`;
 
-export function createLetter(stage, dados, { token, onOpen }) {
+export function createLetter(stage, dados, { token, onRide }) {
   const ev = dados.evento;
   stage.innerHTML = `
     <div class="lt">${PAPEL}
@@ -94,10 +95,13 @@ export function createLetter(stage, dados, { token, onOpen }) {
         <div class="lt-flap lt-flap-out"><div class="lt-flap-face">${ABA_FORA}</div></div>
         <button class="lt-seal" type="button" data-act="open" aria-label="Abrir o convite: romper o selo de cera">${SELO}</button>
       </div>
-      <div class="lt-open"><button class="btn pri" type="button" data-act="open">Abrir convite</button></div>
-      <div class="rsvp" hidden></div>
+      <div class="lt-open"><button class="chip" type="button" data-act="open"><span>Role para abrir o convite</span><svg aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+      <div class="rsvp"></div>
       <p class="sr-only" data-texto></p>
     </div>`;
+  // The stage is always laid out (its height is part of the page's scroll); until the envelope comes it is only unseen.
+  stage.classList.add('fora');
+  stage.hidden = false;
 
   const $ = (s) => stage.querySelector(s);
   const lt = $('.lt'), sheet = $('.lt-sheet'), envb = $('.lt-envb'), envf = $('.lt-envf'), seal = $('.lt-seal');
@@ -164,8 +168,9 @@ export function createLetter(stage, dados, { token, onOpen }) {
   }
 
   let estado = 'fora'; // fora | chegou | abrindo | aberto
-  let anims = [], T0 = '', T1 = '', ocupado = false;
+  let anims = [], T0 = '', T1 = '', ocupado = false, focar = false;
   let dentro = 0;      // how far in the envelope is: 0 below the screen, 1 in place (it rides the scroll)
+  let abertura = 0;    // how far open: 0 sealed, 1 the letter lies unfolded (it rides the scroll too)
   const pecas = [envb, envf, abrir];
   const queda = () => (1 - dentro) ** 2 * innerHeight;   // how far below its place: quick at first, settling gently
 
@@ -177,21 +182,26 @@ export function createLetter(stage, dados, { token, onOpen }) {
     veil.style.opacity = (dentro * dentro * (3 - 2 * dentro)).toFixed(3);
   }
 
+  // Where the folded letter sits inside the envelope (T0) and how far it rises out of it (T1). Measured
+  // with nothing moving: an opening under way is taken down, measured and put back at the same point.
   function place() {
-    if (estado === 'abrindo') return;
     ajustar();
     if (estado === 'aberto') return;
+    const tinha = anims.length > 0;
+    limpar();
     pecas.forEach((el) => { el.style.transform = ''; });   // measured where they rest
     sheet.style.transform = 'none';
     const e = envb.getBoundingClientRect(), s = sheet.getBoundingClientRect();
-    if (!s.width || !e.width) return;
-    const terco = s.height / 3;
-    const k = Math.min((e.width * 0.9) / s.width, (e.height * 0.9) / terco); // the folded letter fits inside the envelope
-    const dx = e.left + e.width / 2 - (s.left + s.width / 2);
-    const dy = e.top + e.height * 0.52 - (s.top + (s.height * k) / 2); // origin is the top edge
-    T0 = `translate(${dx}px, ${dy}px) scale(${k})`;
-    T1 = `translate(${dx}px, ${dy - e.height * 1.02}px) scale(${k})`;
+    if (s.width && e.width) {
+      const terco = s.height / 3;
+      const k = Math.min((e.width * 0.9) / s.width, (e.height * 0.9) / terco); // the folded letter fits inside the envelope
+      const dx = e.left + e.width / 2 - (s.left + s.width / 2);
+      const dy = e.top + e.height * 0.52 - (s.top + (s.height * k) / 2); // origin is the top edge
+      T0 = `translate(${dx}px, ${dy}px) scale(${k})`;
+      T1 = `translate(${dx}px, ${dy - e.height * 1.02}px) scale(${k})`;
+    }
     pose();
+    if (tinha) { montar(); mover(); }
   }
   addEventListener('resize', () => requestAnimationFrame(place));
 
@@ -201,42 +211,50 @@ export function createLetter(stage, dados, { token, onOpen }) {
     return a;
   };
   const limpar = () => { anims.forEach((a) => a.cancel()); anims = []; };
-  // The envelope follows the scroll (main.js calls this every frame while the letter is closed):
-  // 0 = still below the screen, 1 = in place, with the hall dimmed and blurred behind it. Scrolling
-  // back up sends it down again, so the hall can be looked at for as long as the guest likes.
+  // The envelope follows the scroll (main.js calls this every frame): 0 = still below the screen,
+  // 1 = in place, with the hall dimmed and blurred behind it. Scrolling back up sends it down again,
+  // so the hall can be looked at for as long as the guest likes.
   function enter(e) {
-    if (estado === 'abrindo' || estado === 'aberto') return;
+    if (abertura > 0) return;
     e = Math.min(1, Math.max(0, e));
     if (e === dentro) return;
     const estava = dentro > 0;
     dentro = e;
     estado = e > 0 ? 'chegou' : 'fora';
     lt.classList.toggle('on', e >= 0.999);
-    if (e > 0 && !estava) { stage.hidden = false; place(); }   // place() measures, then poses
+    stage.classList.toggle('fora', e === 0);
+    if (e > 0 && !estava) place();   // place() measures, then poses
     else pose();
-    if (e === 0) stage.hidden = true;
   }
 
-  function open() {
-    if (estado !== 'chegou') return;
-    estado = 'abrindo';
-    limpar();
-    onOpen?.();
-    // not quite in place yet (the seal was tapped on its way up): it settles first
-    const y = queda();
-    dentro = 1;
-    pose();
-    veil.style.opacity = '';
-    veil.classList.add('on');
-    lt.classList.add('on');
-    if (y > 1 && !calmo()) {
-      const sobe = (el, fim) => run(el, [{ transform: `translateY(${y.toFixed(1)}px) ${fim}` }, { transform: `translateY(0px) ${fim}` }], { duration: 450, easing: 'cubic-bezier(.2,.8,.2,1)' });
-      pecas.forEach((el) => sobe(el, ''));
-      sobe(sheet, T0).finished.then(() => { limpar(); romper(); }).catch(() => {});
-    } else romper();
+  // The opening follows the scroll as well: 0 = sealed, 1 = the letter lies unfolded. It is one
+  // timeline (seal, flap, the letter out and down, the two folds) held still and moved by hand, so it
+  // plays backwards just the same. With reduced motion it has two states only: closed and open.
+  const TEMPO = 6050;   // the timeline's length, in its own milliseconds
+  function unfold(o) {
+    o = Math.min(1, Math.max(0, o));
+    if (calmo()) o = o < 0.5 ? 0 : 1;
+    if (o === abertura) return;
+    if (o > 0 && dentro < 1) enter(1);
+    abertura = o;
+    if (o === 0) {
+      if (estado === 'aberto') dobrar();
+      limpar();
+      lt.classList.remove('opening');
+      estado = 'chegou';
+      pose();
+    } else if (o === 1) {
+      if (estado !== 'aberto') settle();
+    } else {
+      if (estado === 'aberto') dobrar();
+      estado = 'abrindo';
+      if (!anims.length) montar();
+      mover();
+    }
   }
+  const mover = () => { const t = abertura * TEMPO; anims.forEach((a) => { a.currentTime = t; }); };
 
-  function romper() {
+  function montar() {
     lt.classList.add('opening'); // T0 / T1 were set when the envelope came in and on every resize
     run(abrir, [{ opacity: 1 }, { opacity: 0 }], { duration: 350 });
     run(seal, [
@@ -259,20 +277,19 @@ export function createLetter(stage, dados, { token, onOpen }) {
     run(sheet, [{ zIndex: 2, easing: 'steps(1, end)' }, { zIndex: 4 }], { duration: 2300 * 0.42, delay: 2150, easing: 'linear' });
     [envb, envf].forEach((e) => run(e, [{ transform: 'translateY(0)', opacity: 1 }, { transform: 'translateY(40%)', opacity: 0 }], { duration: 900, delay: 3100, easing: 'ease-in' }));
     run(top, [{ transform: 'perspective(160em) rotateX(-180deg)' }, { transform: 'perspective(160em) rotateX(0deg)' }], { duration: 1100, delay: 4300 });
-    const fim = run(bot, [{ transform: 'perspective(160em) rotateX(180deg)' }, { transform: 'perspective(160em) rotateX(0deg)' }], { duration: 1100, delay: 4950 });
-    if (calmo()) anims.forEach((a) => a.finish());
-    fim.finished.then(settle).catch(() => {});
+    run(bot, [{ transform: 'perspective(160em) rotateX(180deg)' }, { transform: 'perspective(160em) rotateX(0deg)' }], { duration: 1100, delay: 4950 });
+    anims.forEach((a) => a.pause());
   }
 
-  // The unfolded letter stays exactly where the animation left it: the resting pose is written
-  // while the finished animations still hold it, the style is flushed, and only then are the
-  // animations dropped. No transition is declared on any of these, so nothing can move.
+  // The unfolded letter stays exactly where the timeline left it: the resting pose is written
+  // while the timeline still holds it, the style is flushed, and only then is the timeline
+  // dropped. No transition is declared on any of these, so nothing can move.
   function settle() {
-    if (estado !== 'abrindo') return;
     estado = 'aberto';
     sheet.style.transform = top.style.transform = bot.style.transform = 'none';
     lt.classList.remove('opening');
     lt.classList.add('open');
+    stage.classList.add('aberto');   // what follows the letter (answer, gifts, goodbye) is there now
     envb.hidden = envf.hidden = abrir.hidden = true;
     void sheet.offsetWidth;
     limpar();
@@ -282,13 +299,25 @@ export function createLetter(stage, dados, { token, onOpen }) {
     sheet.tabIndex = -1;
     sheet.querySelectorAll('.lt-face:not(.back) .inv:not([aria-hidden]) a').forEach((a) => a.removeAttribute('tabindex'));
 
-    // from here on the stage is a page: the answer sits right under the letter
     const semResposta = !dados.resposta && !dados.encerrado;
-    mostrar(semResposta ? 'pedir' : 'resposta');
-    rsvp.hidden = false;
-    page.start({ alvo: rsvp, texto: semResposta ? 'Role para responder' : 'Role para ver sua resposta' });
-    if (!calmo()) rsvp.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 700, delay: 150, fill: 'backwards', easing: 'ease' });
-    sheet.focus({ preventScroll: true });
+    page.show(true, { alvo: rsvp, texto: semResposta ? 'Role para responder' : 'Role para ver sua resposta' });
+    if (focar) { focar = false; sheet.focus({ preventScroll: true }); }   // opened from the keyboard: reading goes on in the letter
+  }
+
+  // Scrolling back up: the open letter is three folded panels over its envelope again, ready for
+  // the timeline to take it from its last frame.
+  function dobrar() {
+    estado = 'abrindo';
+    lt.classList.remove('open');
+    stage.classList.remove('aberto');
+    envb.hidden = envf.hidden = abrir.hidden = false;
+    top.style.transform = bot.style.transform = '';
+    sheet.setAttribute('aria-hidden', 'true');
+    sheet.removeAttribute('role');
+    sheet.removeAttribute('aria-label');
+    sheet.querySelectorAll('a').forEach((a) => { a.tabIndex = -1; });
+    page.show(false);
+    place();
   }
 
   // ---- answers (the block right under the letter)
@@ -383,14 +412,18 @@ export function createLetter(stage, dados, { token, onOpen }) {
     const alvo = e.target.closest('[data-act]');
     if (!alvo || alvo.disabled) return;
     const a = alvo.dataset.act;
-    if (a === 'open') open();
+    if (a === 'open') { focar = true; onRide?.(); }   // the seal and the hint are buttons: they scroll the opening through
     else if (a === 'sim' || a === 'nao') responder(a);
     else if (a === 'mudar') trocar('mudar');
     else if (a === 'voltar') trocar('resposta');
   });
 
+  mostrar(!dados.resposta && !dados.encerrado ? 'pedir' : 'resposta');   // the answer block has its place from the start
+  place();
+
   return {
     enter,
+    unfold,
     // one step of the main loop: the open page's scroll progress, 0 (top) to 1 (bottom); 0 until the letter is open
     tick: (dt) => page.tick(dt),
     get estado() { return estado; },
