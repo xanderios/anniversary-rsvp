@@ -1,16 +1,17 @@
 // The 3D world: garden + castle (exterior) and the party hall (interior), both exported from
 // Blender. The garden carries colour and soft occlusion in its vertex colours and is lit live
 // (sun or moon, sky); the hall's light is baked entirely (Cycles) and is drawn unlit.
+// The sun and the moon themselves ride a wheel behind the land: half a turn swaps day and night.
 // Everything that costs frame time is scaled by a quality preset (see ../quality.js).
 import {
   AdditiveBlending, BufferGeometry, CatmullRomCurve3, Color, DirectionalLight, Float32BufferAttribute, Fog, HemisphereLight,
-  Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhongMaterial, PCFShadowMap, PerspectiveCamera, PlaneGeometry,
+  IcosahedronGeometry, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhongMaterial, Object3D, PCFShadowMap, PerspectiveCamera, PlaneGeometry,
   PointLight, Points, Quaternion, SRGBColorSpace, Scene, ShaderMaterial, Vector3, WebGLRenderTarget, WebGLRenderer,
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { GATE, GATE_ANGLE, HALL, KEYS, SWAP, fovFor, lensTan, monotone, smooth, span } from './journey.js';
-import { SKY } from './sky.js';
+import { SKY, nightOf, through, twilightOf } from './sky.js';
 import gardenLow from '../models/garden-low.glb?url';
 import gardenMed from '../models/garden.glb?url';
 import gardenHigh from '../models/garden-high.glb?url';
@@ -26,13 +27,26 @@ const MODELS = {
 const b2t = ([x, y, z]) => new Vector3(x, z, -y); // Blender (Z up) -> three (Y up)
 const lerp = (a, b, t) => a + (b - a) * t;
 
-// Light by day and by night (the sky's own colours are in sky.js, shared with the page).
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const wrap = (x) => ((x % 1) + 1) % 1;
+
+// Light by day, at twilight and by night (the sky's own colours are in sky.js, shared with the page).
 const LIGHT = {
   day: { hemiSky: 0xfff4f2, hemiGround: 0xf6ddd6, hemi: 2.35, sun: 0xfff1e4, sunI: 1.5 },
+  dusk: { hemiSky: 0xffd6c4, hemiGround: 0xdcaab2, hemi: 1.95, sun: 0xffb486, sunI: 1.2 },
+  dawn: { hemiSky: 0xffdfd4, hemiGround: 0xe2b6c0, hemi: 2.0, sun: 0xffc4a0, sunI: 1.2 },
   night: { hemiSky: 0xb4c0f2, hemiGround: 0x7377ac, hemi: 1.5, sun: 0xc6d3ff, sunI: 0.8 },
 };
 
-export async function createWorld(canvas, onProgress, { preset, night = 0 } = {}) {
+// Where the sun (by day) and the moon (by night) rest: up and to the right of the castle, as seen
+// from the walk. BODY is their radius and HALO the reach of their glow, in radii.
+const REST = { az: 10.5, el: 11.0 };      // degrees to the right of the castle's axis, and above the horizon
+const BODY = 0.066;                       // radius, as a share of the lens (so it keeps its size on screen)
+const HALO = 3.4;
+const TURN = { time: 0.6, speed: 0.17 };  // the wheel: seconds to pick up speed, and turns per second at most
+
+// `sky` is the phase the scene opens at (see sky.js): 0 = day, 0.5 = night.
+export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart = 0 } = {}) {
   const renderer = new WebGLRenderer({ canvas, antialias: preset.antialias, alpha: false, stencil: false, powerPreference: 'high-performance' });
   const mobile = matchMedia('(pointer: coarse)').matches;
   let scale = 1;                                   // the governor lowers this when frames run late
@@ -136,6 +150,61 @@ export async function createWorld(canvas, onProgress, { preset, night = 0 } = {}
   ext.add(sky);
   disposables.push(skyGeo, skyMat);
 
+  // The sun and the moon: two faceted balls, each with a soft glow, at opposite ends of one wheel.
+  // They are drawn at the distance where the haze closes, so the garden, the castle and the clouds
+  // pass in front of them, and far land that has already melted into the sky stays behind.
+  const ballGeo = new IcosahedronGeometry(1, 1), haloGeo = new PlaneGeometry(2, 2);
+  disposables.push(ballGeo, haloGeo);
+  const restDir = new Vector3(Math.sin(REST.az * Math.PI / 180) * Math.cos(REST.el * Math.PI / 180), Math.sin(REST.el * Math.PI / 180),
+    -Math.cos(REST.az * Math.PI / 180) * Math.cos(REST.el * Math.PI / 180));
+  const body = (isSun) => {
+    const uniforms = { uAlpha: { value: 1 }, uLow: { value: 0 }, uTime: time };   // uLow: 0 high in the sky, 1 down at the horizon
+    const defines = isSun ? { SUN: 1 } : {};
+    const ballMat = new ShaderMaterial({
+      uniforms, defines, transparent: true, depthWrite: false, fog: false,
+      vertexShader: 'varying vec3 vView; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vView = mv.xyz; gl_Position = projectionMatrix * mv; }',
+      fragmentShader: `uniform float uAlpha; uniform float uLow; varying vec3 vView;
+        void main(){ vec3 n = normalize(cross(dFdx(vView), dFdy(vView)));                              // one flat tone per facet
+          float k = smoothstep(-0.35, 0.95, dot(n, normalize(vec3(-0.5, 0.62, 0.6))));
+          #ifdef SUN
+            vec3 col = mix(vec3(1.0, 0.79, 0.38), vec3(1.0, 0.95, 0.70), k);
+            col = mix(col, mix(vec3(0.98, 0.52, 0.36), vec3(1.0, 0.77, 0.54), k), uLow);              // sets red
+          #else
+            vec3 col = mix(vec3(0.71, 0.76, 0.93), vec3(0.99, 0.98, 0.92), k);
+            col = mix(col, mix(vec3(0.86, 0.66, 0.62), vec3(1.0, 0.91, 0.80), k), uLow * 0.7);        // rises warm
+          #endif
+          gl_FragColor = vec4(col, uAlpha); }`,
+    });
+    const glowMat = new ShaderMaterial({
+      uniforms, defines: { ...defines, HALO: HALO.toFixed(2) }, transparent: true, depthWrite: false, fog: false,
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `uniform float uAlpha; uniform float uLow; uniform float uTime; varying vec2 vUv;
+        void main(){ vec2 p = (vUv - 0.5) * 2.0 * HALO; float d = length(p);                           // d: distance in radii
+          float away = max(d - 0.9, 0.0);
+          #ifdef SUN
+            float rays = 0.5 + 0.5 * cos(atan(p.y, p.x) * 12.0 + uTime * 0.1); rays *= rays;
+            float glow = exp(-away * 1.9) * 0.62 + rays * exp(-away * 1.3) * 0.2;
+            vec3 col = mix(vec3(1.0, 0.96, 0.78), vec3(1.0, 0.72, 0.52), uLow);
+          #else
+            float glow = exp(-away * 1.6) * 0.46;
+            vec3 col = mix(vec3(0.80, 0.87, 1.0), vec3(1.0, 0.84, 0.74), uLow * 0.7);
+          #endif
+          float a = glow * smoothstep(HALO, HALO * 0.6, d) * uAlpha; if (a < 0.003) discard;
+          gl_FragColor = vec4(col, a); }`,
+    });
+    disposables.push(ballMat, glowMat);
+    const ball = new Mesh(ballGeo, ballMat), halo = new Mesh(haloGeo, glowMat), root = new Object3D();
+    halo.scale.setScalar(HALO);
+    halo.renderOrder = -50; ball.renderOrder = -49;   // after the stars, before everything else that glows
+    ball.frustumCulled = halo.frustumCulled = false;
+    ball.rotation.set(0.4, isSun ? 0.3 : 2.1, 0.2);
+    root.add(halo, ball);
+    ext.add(root);
+    return { root, ball, halo, uniforms, dir: new Vector3(), x: 0, y: 0, lag: isSun ? 0 : 0.5 };
+  };
+  const bodies = [body(true), body(false)];
+  let bodyFar = 100;
+
   const hemi = new HemisphereLight(0xffffff, 0xffffff, 1);
   ext.add(hemi);
   const sun = new DirectionalLight(0xffffff, 1);
@@ -207,6 +276,7 @@ export async function createWorld(canvas, onProgress, { preset, night = 0 } = {}
     p[i * 3] = (Math.random() - 0.5) * 520; p[i * 3 + 1] = 6 + Math.pow(Math.random(), 0.8) * 190; p[i * 3 + 2] = -150 - Math.random() * 110;
     r[i * 2] = Math.random(); r[i * 2 + 1] = Math.random();
   }, [['position', 3], ['aRnd', 2]], starMat);
+  stars.renderOrder = -60;                          // behind the moon
   ext.add(stars);
   const meteorMat = new ShaderMaterial({
     uniforms: { uAlpha: { value: 0 } }, transparent: true, depthWrite: false, blending: AdditiveBlending, side: 2,
@@ -217,6 +287,7 @@ export async function createWorld(canvas, onProgress, { preset, night = 0 } = {}
   const meteor = new Mesh(new PlaneGeometry(1, 1), meteorMat);
   meteor.frustumCulled = false;
   meteor.visible = false;
+  meteor.renderOrder = -55;
   ext.add(meteor);
   disposables.push(meteor.geometry, meteorMat);
   const shot = { t: 0, dur: 1, wait: 3 + Math.random() * 4, from: new Vector3(), dir: new Vector3(), len: 24 };
@@ -356,29 +427,55 @@ export async function createWorld(canvas, onProgress, { preset, night = 0 } = {}
   }, [['position', 3], ['aRnd', 3]], hallPetMat));
 
   // ---------------------------------------------------------------- day and night
+  // `phase` is where the wheel stands (0 = day, 0.5 = night); it only ever turns forward, towards
+  // `goal`. Everything the hour changes is set from it: sky, haze, light, lanterns, stars.
   const cA = new Color(), cB = new Color();
   const mix = (a, b, t) => cA.set(a).lerp(cB.set(b), t);
-  let nightNow = -1;
-  function setNight(n) {
-    n = Math.min(1, Math.max(0, n));
-    if (Math.abs(n - nightNow) < 0.002) return;
-    nightNow = n;
-    skyMat.uniforms.uTop.value.copy(mix(SKY.day.top, SKY.night.top, n));
-    skyMat.uniforms.uBottom.value.copy(mix(SKY.day.fog, SKY.night.fog, n));
-    ext.fog.color.copy(mix(SKY.day.fog, SKY.night.fog, n));
-    hemi.color.copy(mix(LIGHT.day.hemiSky, LIGHT.night.hemiSky, n));
-    hemi.groundColor.copy(mix(LIGHT.day.hemiGround, LIGHT.night.hemiGround, n));
-    hemi.intensity = lerp(LIGHT.day.hemi, LIGHT.night.hemi, n);
-    sun.color.copy(mix(LIGHT.day.sun, LIGHT.night.sun, n));
-    sun.intensity = lerp(LIGHT.day.sunI, LIGHT.night.sunI, n);
-    lampGain.value.setRGB(1.0, 0.7, 0.4).multiplyScalar(1.1 * n);
-    lampGlass.color.setRGB(lerp(0.9, 1.35, n), lerp(0.88, 1.2, n), lerp(0.82, 0.92, n));
-    starMat.uniforms.uNight.value = n;
-    haloMat.uniforms.uNight.value = n;
+  let phase = wrap(skyAtStart), goal = phase, turning = 0, topSpeed = TURN.speed, nightNow = 0, painted = -1;
+  function paint() {
+    painted = phase;
+    const n = nightNow = nightOf(phase), tw = twilightOf(phase), S = SKY[tw], L = LIGHT[tw];
+    skyMat.uniforms.uTop.value.copy(through([SKY.day.top, S.top, SKY.night.top], n, mix));
+    skyMat.uniforms.uBottom.value.copy(through([SKY.day.bottom, S.bottom, SKY.night.bottom], n, mix));
+    ext.fog.color.copy(skyMat.uniforms.uBottom.value);
+    hemi.color.copy(through([LIGHT.day.hemiSky, L.hemiSky, LIGHT.night.hemiSky], n, mix));
+    hemi.groundColor.copy(through([LIGHT.day.hemiGround, L.hemiGround, LIGHT.night.hemiGround], n, mix));
+    hemi.intensity = through([LIGHT.day.hemi, L.hemi, LIGHT.night.hemi], n, lerp);
+    sun.color.copy(through([LIGHT.day.sun, L.sun, LIGHT.night.sun], n, mix));
+    sun.intensity = through([LIGHT.day.sunI, L.sunI, LIGHT.night.sunI], n, lerp);
+    const lamps = smooth(span(n, [0.2, 0.85])), dark = smooth(span(n, [0.4, 1]));   // lanterns come on at dusk; stars wait for the dark
+    lampGain.value.setRGB(1.0, 0.7, 0.4).multiplyScalar(1.1 * lamps);
+    lampGlass.color.setRGB(lerp(0.9, 1.35, lamps), lerp(0.88, 1.2, lamps), lerp(0.82, 0.92, lamps));
+    starMat.uniforms.uNight.value = dark;
+    haloMat.uniforms.uNight.value = lamps;
     sparkMat.uniforms.uGain.value = lerp(0.85, 1, n);
-    stars.visible = halos.visible = n > 0.01;
+    stars.visible = dark > 0.01;
+    halos.visible = lamps > 0.01;
   }
-  setNight(night);
+  // Turn the wheel to a phase: smoothly (the sun or the moon leaves to the left as the other one
+  // rises on the right), or at once.
+  function setSky(target, instant = false) {
+    target = wrap(target);
+    if (instant) { phase = goal = target; turning = 0; paint(); return; }
+    let ahead = wrap(target - wrap(phase));
+    if (ahead > 0.9995) ahead = 0;                  // already there, give or take rounding
+    goal = phase + ahead;
+    topSpeed = Math.max(TURN.speed, ahead / 3.2);   // a long way round still takes only a few seconds
+  }
+  function turn(dt) {
+    if (phase === goal || dt <= 0) return;
+    // critically damped, with a top speed: picks up gently, turns evenly, settles softly
+    const omega = 2 / TURN.time, x = omega * dt, decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+    const gap = clamp(phase - goal, -topSpeed * TURN.time, topSpeed * TURN.time), aim = phase - gap;
+    const push = (turning + omega * gap) * dt;
+    turning = (turning - omega * push) * decay;
+    phase = aim + (gap + push) * decay;
+    if (goal - phase < 0.0003) {
+      phase = goal = wrap(goal);
+      turning = 0;
+    }
+  }
+  paint();
 
   // ---------------------------------------------------------------- camera
   const cam = new PerspectiveCamera(30, 1.5, 0.3, 400);
@@ -450,11 +547,46 @@ export async function createWorld(canvas, onProgress, { preset, night = 0 } = {}
     meteorMat.uniforms.uAlpha.value = Math.sin(Math.PI * Math.min(1, f * 1.15)) * nightNow;
   }
 
+  // Where the sun and the moon stand, seen from the walk (before the guest looks around): fwd, right
+  // and up are the camera's own axes there, and positions are tangents off its line of sight.
+  // Their wheel is an ellipse behind the land, centred under the castle: the one in the sky rests up
+  // on the right, a turn carries it over the towers and down on the left while the other one comes
+  // up on the right. High above the garden the camera looks down, and the sky leans with it so the
+  // resting place stays in the picture.
+  function aimBodies(tanH) {
+    const tv = Math.tan((cam.fov * Math.PI) / 360), th = tv * aspect, r = BODY * tanH;
+    const ahead = restDir.dot(fwd);
+    const ax = clamp(restDir.dot(right) / ahead, -0.72 * th, 0.72 * th), ay = Math.min(restDir.dot(up) / ahead, 0.74 * tv);
+    bodyFar = lerp(ext.fog.near, ext.fog.far, 0.65);   // behind all that is still solid, in front of what is mostly haze
+    const ground = Math.tan(-Math.asin(Math.min(0.9, pos.y / bodyFar)) - Math.asin(fwd.y));   // where the land ends, at that distance
+    const cy = ground + 0.3 * (ay - ground), dy = ay - cy, top = 0.9 * tv - 1.3 * r;
+    // a circle where it fits under the top of the picture, flatter where it does not
+    const flat = clamp(Math.sqrt(Math.max(0, (top - cy) ** 2 - dy * dy)) / Math.max(1e-3, Math.abs(ax)), 0.12, 1);
+    const A = Math.hypot(ax, dy / flat), B = flat * A, rest = Math.atan2(ax / A, dy / B), high = Math.cos(rest);
+    // Half a turn of the wheel for half a turn of the sky, but not evenly: at twilight (a quarter turn)
+    // one is setting on the left just as the other rises on the right, wherever the resting place is.
+    const half = phase * 2, u = half - Math.floor(half);
+    const turned = (Math.floor(half) + u) * Math.PI + clamp(rest, 0, 0.9) * Math.sin(Math.PI * u) ** 2;
+    for (const b of bodies) {
+      const a = rest - turned - b.lag * 2 * Math.PI, c = Math.cos(a);
+      const show = smooth(span(c, [-0.32, Math.min(0.06, 0.5 * high)]));   // fades into the haze below the wheel's own horizon
+      b.root.visible = show > 0.004;
+      if (!b.root.visible) continue;
+      b.x = A * Math.sin(a); b.y = cy + B * c;
+      b.dir.copy(fwd).addScaledVector(right, b.x).addScaledVector(up, b.y).normalize();
+      b.root.scale.setScalar(bodyFar * r);
+      b.uniforms.uAlpha.value = show;
+      b.uniforms.uLow.value = 1 - smooth(span(c, [0.05, 0.9 * high]));
+    }
+  }
+
   function frame(p, dt, tiltTarget, page = 0) {
     if (disposed) return p >= SWAP;
     resize();
     time.value += dt;
     const t = time.value;
+    turn(dt);
+    if (phase !== painted) paint();
     const e = 1 - Math.exp(-dt * 3.5);
     tilt.x += ((tiltTarget?.x || 0) - tilt.x) * e;
     tilt.y += ((tiltTarget?.y || 0) - tilt.y) * e;
@@ -499,6 +631,7 @@ export async function createWorld(canvas, onProgress, { preset, night = 0 } = {}
     fwd.normalize();
     right.crossVectors(fwd, up.set(0, 1, 0)).normalize();
     up.crossVectors(right, fwd);
+    if (!inHall) aimBodies(tanH);
     const amp = dist * (inHall ? 0.03 : 0.045);
     pos.addScaledVector(right, tilt.x * amp).addScaledVector(up, -tilt.y * amp * 0.6);
     cam.position.copy(pos);
@@ -531,6 +664,14 @@ export async function createWorld(canvas, onProgress, { preset, night = 0 } = {}
       }
       glow.color.setScalar((0.95 + 0.05 * Math.sin(t * 2.3)) * lerp(1, 1.22, nightNow));
       shootingStar(dt);
+      for (const b of bodies) {
+        if (!b.root.visible) continue;
+        // looking around: they drift a little with the far clouds, but never as far as out of the picture
+        b.dir.lerp(fwd.set(b.x, b.y, -1).normalize().applyQuaternion(cam.quaternion), 0.6).normalize();
+        b.root.position.copy(cam.position).addScaledVector(b.dir, bodyFar);
+        b.halo.quaternion.copy(cam.quaternion);
+        b.ball.rotation.y += dt * 0.07;
+      }
       skyMat.uniforms.uInvProj.value.copy(cam.projectionMatrixInverse);
       renderer.render(ext, cam);
     } else {
@@ -564,7 +705,8 @@ export async function createWorld(canvas, onProgress, { preset, night = 0 } = {}
   frame(0, 0, null);
 
   return {
-    frame, renderer, setNight,
+    frame, renderer, setSky,
+    get phase() { return wrap(phase); },
     setScale(s) { if (s !== scale) { scale = s; resize(true); } },
     dispose() {
       disposed = true;

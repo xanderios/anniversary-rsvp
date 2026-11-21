@@ -1,4 +1,4 @@
-/* The 3D scene's own page styles: the sky behind it and the quality menu (the cog, top right). */
+/* The 3D scene's own page styles: the sky behind it and the cog's menu, top right (sky and quality). */
 
 /* A canvas that is taking over from another (quality change) sits exactly where the first one is. */
 canvas.gl-next { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; touch-action: pan-y; }
@@ -19,6 +19,16 @@ canvas.gl-next { position: fixed; inset: 0; width: 100%; height: 100%; display: 
   box-shadow: inset 0 0 0 1px var(--gold-soft), 0 18px 40px -18px rgba(60, 30, 50, .7); animation: aj-entra .18s ease both; transform-origin: 100% 0; }
 @keyframes aj-entra { from { opacity: 0; transform: translateY(-6px) scale(.97); } }
 .aj-title { margin: 0 10px 8px; font-size: 13px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--gold); }
+.aj-menu > div + .aj-title, .aj-nota + .aj-title { margin-top: 14px; }
+/* the sky: three choices side by side (the clock's, day, night) */
+.aj-ceu { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 0 4px; padding: 4px; border-radius: 14px; background: rgba(230, 205, 152, .2); }
+.aj-seg { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 58px; padding: 6px 4px; border: 0; border-radius: 10px; background: none; cursor: pointer; color: var(--ink-soft); font: inherit; -webkit-tap-highlight-color: transparent;
+  transition: background-color .15s ease, color .15s ease, box-shadow .15s ease; }
+.aj-seg svg { width: 22px; height: 22px; color: var(--gold); }
+.aj-seg b { font-size: 16px; font-weight: 700; line-height: 1.1; }
+.aj-seg[aria-checked='true'] { background: var(--paper); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--gold-hi), 0 3px 8px -5px rgba(60, 30, 50, .6); }
+.aj-nota { margin: 6px 10px 0; min-height: 1.2em; font-size: 15px; font-style: italic; line-height: 1.2; color: var(--ink-soft); }
+@media (hover: hover) { .aj-seg:hover:not([aria-checked='true']) { background: rgba(230, 205, 152, .3); } }
 .aj-op { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 7px 10px; border: 0; border-radius: 12px; background: none; text-align: left; cursor: pointer; color: inherit; font: inherit; -webkit-tap-highlight-color: transparent; }
 .aj-op i { flex: none; width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--gold-hi); transition: box-shadow .15s ease, background-color .15s ease; }
 .aj-op[aria-checked='true'] i { background: var(--gold); box-shadow: inset 0 0 0 2px var(--gold), inset 0 0 0 5px var(--paper); }
@@ -27,5 +37,5 @@ canvas.gl-next { position: fixed; inset: 0; width: 100%; height: 100%; display: 
 .aj-op[aria-checked='true'] { background: rgba(230, 205, 152, .22); }
 .aj-op:disabled { cursor: progress; opacity: .7; }
 @media (hover: hover) { .aj-op:hover:not(:disabled) { background: rgba(230, 205, 152, .32); } }
-.aj-cog:focus-visible, .aj-op:focus-visible { outline: 2px solid var(--roof); outline-offset: 2px; }
+.aj-cog:focus-visible, .aj-op:focus-visible, .aj-seg:focus-visible { outline: 2px solid var(--roof); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .aj-menu { animation: none; } .aj-cog svg { transition: none; } }
