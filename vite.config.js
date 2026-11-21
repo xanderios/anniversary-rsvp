@@ -39,7 +39,7 @@ const fotos = () => ({
 export default defineConfig({
   root: 'web',
   plugins: [rotas(), fotos()],
-  server: { proxy: { '/api': API, '^/c/[^/]+/evento\\.ics$': API } },
+  server: { proxy: { '/api': API, '^/c/[^/]+/(evento\\.ics|og\\.jpg)$': API } },
   build: {
     outDir: '../dist',
     emptyOutDir: true,

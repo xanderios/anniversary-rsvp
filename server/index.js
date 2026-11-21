@@ -9,6 +9,7 @@ import { config, evento, inicioMs, mapaUrl, prazoMs, SENHA_MIN, textos, wazeUrl 
 import { store } from './store.js';
 import { bloqueado, falta, limite, tokenOk } from './security.js';
 import { rotasAdmin } from './admin.js';
+import { ogImagem, ogTags } from './og.js';
 
 const app = new Hono();
 
@@ -115,6 +116,11 @@ function dadosConvite(r) {
   };
 }
 
+// Apps that only fetch the page to draw a link preview (WhatsApp does it on the phone of whoever
+// is sending the link) are not the guest: they must not mark the invitation as opened.
+const PREVIA = /WhatsApp|facebookexternalhit|Facebot|Twitterbot|TelegramBot|Slackbot|Discordbot|LinkedInBot|SkypeUriPreview|Pinterest|Iframely|Embedly|vkShare|Googlebot|bingbot|Applebot|bot\b|crawler|spider/i;
+const previa = (c) => PREVIA.test(c.req.header('user-agent') || '');
+
 app.get('/', (c) => html(c, 'fechado.html'));
 app.get('/robots.txt', (c) => c.text('User-agent: *\nDisallow: /\n'));
 
@@ -124,10 +130,23 @@ app.get('/c/:token', (c) => {
   if (!r) return html(c, 'fechado.html', 404);
   const base = pagina('index.html');
   if (!base) return semBuild(c);
-  store.abrir(r);
+  if (!previa(c)) store.abrir(r);
   const json = JSON.stringify(dadosConvite(r)).replace(/</g, '\\u003c');
   c.header('Cache-Control', 'no-store');
-  return c.html(base.replace('<!--CONVITE-->', () => `<script id="convite" type="application/json">${json}</script>`));
+  return c.html(base
+    .replace('<!--OG-->', () => ogTags(r))
+    .replace('<!--CONVITE-->', () => `<script id="convite" type="application/json">${json}</script>`));
+});
+
+// The picture shown beside the link in WhatsApp: this invitation's own, with the guest's name.
+app.get('/c/:token/og.jpg', async (c) => {
+  const r = convitePara(c);
+  if (!r || r === 'bloqueado') return c.text('Não encontrado.', 404);
+  const jpg = await ogImagem(r);
+  if (!jpg) return c.text('Não encontrado.', 404);
+  c.header('Content-Type', 'image/jpeg');
+  c.header('Cache-Control', 'public, max-age=86400');   // a renamed invitation gets a new address (?v=)
+  return c.body(jpg);
 });
 
 app.get('/api/convite/:token', (c) => {

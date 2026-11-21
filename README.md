@@ -30,6 +30,22 @@ npm start                 # http://localhost:3000 (ou a PORT do .env)
 - A última linha da página é o crédito "Feito com ❤️ por Alexandre Rios" (`CREDITO` em `web/src/ui/page.js`).
 - `?imagens` no fim do link força a versão com imagens estáticas (sem 3D).
 
+## Imagem do link (WhatsApp)
+
+Cada convite tem a sua própria imagem de prévia, a que o WhatsApp mostra ao lado do link: as flores do convite, a
+moldura dourada, o nome da aniversariante, a data, o local e **o nome do convidado**.
+
+- A imagem é desenhada pelo servidor quando o convite é criado (ou renomeado) no painel e fica em `data/og`. Convites
+  acrescentados à mão em `data/convites.json` ganham a sua na primeira vez que o link é compartilhado.
+- `npm run og` desenha as de todos os convites e mostra onde ficaram (útil para conferir, ou depois de mudar
+  `config/evento.json`).
+- O desenho está em `server/og.js` (cores, tamanhos e posições no começo de cada função; ao mudar o desenho, aumente
+  `DESENHO` para que todas sejam refeitas). O título e o texto que aparecem embaixo da imagem saem de `ogTags`.
+- O endereço da imagem usa o `BASE_URL` do `.env`: em produção ele precisa ser o endereço público, com `https://`.
+- O WhatsApp guarda a prévia de um link que já mostrou. Ao renomear um convite a imagem muda de endereço, mas uma
+  conversa em que o link já foi colado pode continuar mostrando a antiga.
+- A visita que o WhatsApp faz para montar a prévia não conta como "abriu o convite" no painel.
+
 ## Segurança
 
 - Cada link tem 16 caracteres aleatórios (cerca de 93 bits): não dá para adivinhar.

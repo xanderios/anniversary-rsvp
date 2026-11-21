@@ -4,6 +4,7 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { bodyLimit } from 'hono/body-limit';
 import { config, evento, SENHA_MIN } from './config.js';
 import { store } from './store.js';
+import { ogApagar, ogPreparar } from './og.js';
 import { chaveIp, contagem, iguais, limite, segredo, sha } from './security.js';
 
 const SESSAO_MS = 7 * 864e5;
@@ -112,16 +113,25 @@ export function rotasAdmin(ipDe) {
   app.post('/convites', async (c) => {
     if (store.todos().length >= 2000) return erro(c, 409, 'Limite de convites atingido.');
     const r = store.criar((await corpo(c)).nome);
+    ogPreparar(r);   // the picture WhatsApp shows beside the link, with this guest's name
     return r ? c.json(vista(r), 201) : erro(c, 400, 'Escreva o nome que vai no envelope.');
   });
 
   app.patch('/convites/:id', async (c) => {
     const nome = String((await corpo(c)).nome ?? '').trim();
     if (!nome) return erro(c, 400, 'Escreva o nome que vai no envelope.');
-    return store.renomear(Number(c.req.param('id')), nome) ? c.json({ ok: true }) : erro(c, 404, 'Convite não encontrado.');
+    const id = Number(c.req.param('id'));
+    if (!store.renomear(id, nome)) return erro(c, 404, 'Convite não encontrado.');
+    ogPreparar(store.porId(id));   // a new name is a new picture
+    return c.json({ ok: true });
   });
 
-  app.delete('/convites/:id', (c) => (store.excluir(Number(c.req.param('id'))) ? c.json({ ok: true }) : erro(c, 404, 'Convite não encontrado.')));
+  app.delete('/convites/:id', (c) => {
+    const id = Number(c.req.param('id'));
+    if (!store.excluir(id)) return erro(c, 404, 'Convite não encontrado.');
+    ogApagar(id);
+    return c.json({ ok: true });
+  });
 
   app.get('/convites.csv', (c) => {
     const d = (ms) => (ms ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: evento.fuso || 'America/Sao_Paulo' }).format(new Date(ms)) : '');

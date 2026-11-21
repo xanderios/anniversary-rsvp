@@ -68,6 +68,7 @@ carregar(true);
 export const store = {
   todos() { carregar(); return [...convites].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })); },
   porToken(token) { carregar(); return convites.find((c) => c.token === token) || null; },
+  porId(id) { carregar(); return convites.find((c) => c.id === id) || null; },
   criar(nomeBruto) {
     carregar();
     const nome = limpo(nomeBruto);
