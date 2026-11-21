@@ -1,5 +1,5 @@
 import './styles/app.css';
-import { ARRIVE, CAPTIONS, LEAVE, SWAP, TRACK_SCREENS, fadeAt } from './scene/journey.js';
+import { CAPTIONS, ENVELOPE, FADE_OUT, REACH, SWAP, TAIL_SCREENS, TRACK_SCREENS, fadeAt, span } from './scene/journey.js';
 import { createTilt } from './ui/tilt.js';
 import { createLetter } from './ui/letter.js';
 import './styles/scene.css';
@@ -215,8 +215,8 @@ async function start() {
   });
 
   // ---- scroll -> progress
-  const track = $('track'), guide = $('guide'), hint = $('hint'), skip = $('skip'), caption = $('caption'), rail = $('rail'), dot = rail.firstElementChild, fade = $('fade');
-  const medir = () => { track.style.height = Math.round(innerHeight * TRACK_SCREENS) + 'px'; };
+  const track = $('track'), guide = $('guide'), hint = $('hint'), skip = $('skip'), caption = $('caption'), rail = $('rail'), dot = rail.firstElementChild, fade = $('fade'), cue = $('cue');
+  const medir = () => { track.style.height = Math.round(innerHeight * (TRACK_SCREENS + TAIL_SCREENS)) + 'px'; };
   medir();
   let largura = innerWidth;
   addEventListener('resize', () => { if (innerWidth !== largura) { largura = innerWidth; medir(); } }); // ignore mobile URL-bar resizes
@@ -224,11 +224,12 @@ async function start() {
   scrollTo(0, 0);
 
   const fundo = () => document.documentElement.scrollHeight - innerHeight;
+  // how far the scroll has come, in journeys: 1 is the walk's end in the hall, REACH the very bottom
   const alvo = () => {
     const max = fundo();
-    return max > 0 ? Math.min(1, Math.max(0, scrollY / max)) : 0;
+    return max > 0 ? Math.min(1, Math.max(0, scrollY / max)) * REACH : 0;
   };
-  function hud(on) { [guide, rail].forEach((el) => el.classList.toggle('gone', !on)); if (!on) intro.style.visibility = 'hidden'; }
+  function hud(on) { [guide, rail].forEach((el) => el.classList.toggle('gone', !on)); if (!on) { intro.style.visibility = 'hidden'; cue.classList.add('gone'); } }
 
   // "skip" rests on the hint; once the hint sinks away it slides down into the hint's place
   const pill = hint.firstElementChild;
@@ -269,15 +270,16 @@ async function start() {
   ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach((evn) => addEventListener(evn, (e) => { if (!skip.contains(e.target)) parar(); }, { passive: true }));
 
   const suave = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
-  let p = 0, antes = performance.now(), chegou = false, timer = 0, salao = false, some = -1;
+  let x = 0, p = 0, antes = performance.now(), salao = false, some = -1;   // x: the scroll, eased, in journeys; p: the journey itself (0 to 1)
   quadro = () => [p, 0, tilt.state, pagina];
   function loop(agora) {
     const real = (agora - antes) / 1000, dt = Math.min(0.05, real);
     antes = agora;
     governor.tick(real);
-    const a = aberto ? 1 : alvo(); // once the letter is open the journey stays in the hall
-    p += (a - p) * (1 - Math.exp(-dt * (calmo ? 30 : 5)));
-    if (Math.abs(a - p) < 0.0004) p = a;
+    const a = aberto ? REACH : alvo(); // once the letter is open the journey stays in the hall
+    x += (a - x) * (1 - Math.exp(-dt * (calmo ? 30 : 5)));
+    if (Math.abs(a - x) < 0.0004) x = a;
+    p = Math.min(1, x);
 
     const page = letter.tick(dt); // 0 until the letter is open, then the open page's scroll progress, 0 (top) to 1 (bottom)
     const noSalao = world.frame(p, dt, tilt.state, page);
@@ -311,10 +313,12 @@ async function start() {
         if (texto) caption.textContent = texto;
         caption.classList.toggle('show', !!texto);
       }
-      if (passeando && a >= 1 && p >= 0.999) parar();
+      if (passeando && a >= REACH && x >= REACH - 0.001) parar();
 
-      if (!chegou && p >= ARRIVE) { chegou = true; timer = setTimeout(() => letter.arrive(), 650); }
-      else if (chegou && p < LEAVE) { chegou = false; clearTimeout(timer); letter.leave(); }
+      // in the hall the scroll goes on: the hall alone at first, then the envelope rides it up from below
+      const env = span(x, ENVELOPE);
+      letter.enter(env);
+      cue.classList.toggle('gone', passeando || p < FADE_OUT[1] - 0.012 || env > 0.12);
     }
     requestAnimationFrame(loop);
   }

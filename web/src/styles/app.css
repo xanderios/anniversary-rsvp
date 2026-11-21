@@ -11,7 +11,7 @@ html.convite { scrollbar-width: none; }
 html.convite::-webkit-scrollbar { display: none; }
 body.locked { overflow: hidden; }
 .sprite { position: absolute; }
-#track { height: 950vh; }
+#track { height: 1050vh; }
 #sky, #gl, #stills, #fade, #hud, #stage, #loader { position: fixed; inset: 0; }
 #sky { background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom)); transition: background-color .2s; z-index: 0; }
 body.in-hall #sky { background: var(--hall); }
@@ -63,9 +63,10 @@ body.in-hall #sky { background: var(--hall); }
   .in-name { font-size: 4.3em; margin-top: -.06em; margin-bottom: -.1em; }
   .in-bow { width: 6.4em; } .in-flower { width: 3.6em; } .in-sprig { width: 3.3em; }
   #guide { gap: 7px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
-  #hint { gap: 3px; }
-  #hint svg { width: 20px; height: 20px; }
-  #hint span, .chip { font-size: 15px; }
+  #hint, #cue { gap: 3px; }
+  #cue { bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  #hint svg, #cue svg { width: 20px; height: 20px; }
+  #hint span, #cue span, .chip { font-size: 15px; }
 }
 @supports (height: 1dvh) { @media (max-height: 560px) and (min-aspect-ratio: 3/2) { .in-card { font-size: clamp(10px, 3.3dvh, 16px); } } }
 
@@ -75,9 +76,13 @@ body.in-hall #sky { background: var(--hall); }
 #guide.gone { opacity: 0; visibility: hidden; transition: opacity .5s ease, visibility 0s linear .5s; } /* hidden controls leave the tab order */
 #guide.gone .chip { pointer-events: none; }
 #hint { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; transition: opacity .5s ease, transform .6s cubic-bezier(.45, 0, .2, 1); }
-#hint span { font-style: italic; font-weight: 600; font-size: clamp(17px, 4.6em, 22px); line-height: 1.15; background: rgba(255, 251, 246, .92); padding: .55em 1.3em .6em; border-radius: 1.6em;
+#hint span, #cue span { font-style: italic; font-weight: 600; font-size: clamp(17px, 4.6em, 22px); line-height: 1.15; background: rgba(255, 251, 246, .92); padding: .55em 1.3em .6em; border-radius: 1.6em;
   box-shadow: inset 0 0 0 1px var(--gold-soft), 0 6px 18px -8px rgba(120, 60, 70, .6); }
-#hint svg { width: 26px; height: 26px; color: var(--gold); animation: nudge 1.6s ease-in-out infinite; filter: drop-shadow(0 1px 2px rgba(255, 255, 255, .9)); }
+#hint svg, #cue svg { width: 26px; height: 26px; color: var(--gold); animation: nudge 1.6s ease-in-out infinite; filter: drop-shadow(0 1px 2px rgba(255, 255, 255, .9)); }
+/* in the hall: the same kind of hint, for the last stretch of scroll that brings the envelope */
+#cue { position: absolute; left: 50%; bottom: calc(max(22px, 4.2%) + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px;
+  width: max-content; max-width: 92vw; text-align: center; color: var(--ink); transition: opacity .5s ease, visibility 0s; }
+#cue.gone { opacity: 0; visibility: hidden; transition: opacity .5s ease, visibility 0s linear .5s; }
 #guide.moving #hint { opacity: 0; transform: translateY(26px); }
 @keyframes nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
 .chip { pointer-events: auto; cursor: pointer; border: 0; -webkit-tap-highlight-color: transparent;
@@ -115,6 +120,6 @@ body.in-hall #sky { background: var(--hall); }
 @keyframes card-in { from { opacity: 0; transform: translate(-50%, 12%); } }
 
 @media (prefers-reduced-motion: reduce) {
-  #hint svg { animation: none; }
+  #hint svg, #cue svg { animation: none; }
   #intro.on .in-card > * { animation-duration: .01s; animation-delay: 0s; }
 }

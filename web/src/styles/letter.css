@@ -2,8 +2,10 @@
    Sizes: --ew is the envelope's width and --W the letter's; the letter is --R times as tall as
    it is wide (letter.js measures the text and sets --R). Inside the envelope 1em = 1/78 of its
    width; inside the letter 1em = 1% of its width. */
-#veil { position: fixed; inset: 0; z-index: 4; pointer-events: none; background: rgba(120, 70, 78, .3); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); opacity: 0; transition: opacity .9s ease; }
-#veil.on { opacity: 1; }
+/* The veil dims and blurs the hall behind the envelope. While the envelope rides the scroll, letter.js
+   sets its opacity frame by frame (no transition); once the seal is broken it stays (.on). */
+#veil { position: fixed; inset: 0; z-index: 4; pointer-events: none; background: rgba(120, 70, 78, .3); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); opacity: 0; }
+#veil.on { opacity: 1; transition: opacity .5s ease; }
 body.q-low #veil { background: rgba(108, 62, 72, .44); backdrop-filter: none; -webkit-backdrop-filter: none; }
 
 #stage { z-index: 5; pointer-events: none; overflow: hidden; outline: none; }

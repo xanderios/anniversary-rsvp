@@ -20,14 +20,17 @@ export const HALL = {
   to:   { pos: [0, -18.6, 3.9], tgt: [0, 3, 3.8] },
   lens: 30, k: 0.52,
 };
-export const TRACK_SCREENS = 9.5;        // length of the scroll, in screen heights
+export const TRACK_SCREENS = 9.5;        // length of the journey's scroll, in screen heights
 export const GATE = [0.66, 0.8];         // the camera waits at the gates while they swing open
 export const GATE_ANGLE = (105 * Math.PI) / 180;
 export const FADE_IN = [0.84, 0.9];      // cream glow rises
 export const SWAP = 0.9;                 // garden -> hall behind the glow
 export const FADE_OUT = [0.9, 0.95];
-export const ARRIVE = 0.975;             // envelope slides in
-export const LEAVE = 0.88;
+// After the walk ends in the hall the scroll goes on for a while: first the hall alone, to look at,
+// then the envelope rides the scroll up from below (and back down, scrolling up).
+export const TAIL_SCREENS = 1;           // that extra scroll, in screen heights
+export const REACH = 1 + TAIL_SCREENS / (TRACK_SCREENS - 1);   // the very end of the scroll, in journeys (1 = the walk's end)
+export const ENVELOPE = [1.025, 1.105];  // the envelope: still below the screen, in place (in journeys)
 // what the little indicator says while the "skip" ride crosses the garden
 export const CAPTIONS = [
   [0.03, 'Seguindo o caminho até o castelo…'],
