@@ -27,7 +27,7 @@ npm start                 # http://localhost:3000 (ou a PORT do .env)
   convite" leva até o envelope ainda fechado. O tamanho de cada trecho está em `web/src/scene/journey.js`
   (`TAIL_SCREENS`, `OPEN_SCREENS`, `ENVELOPE`, `OPENING`). Com "reduzir movimento" ligado, a carta só tem dois estados:
   fechada e aberta.
-- A última linha da página é o crédito "Feito por xanderios" (`CREDITO` em `web/src/ui/page.js`).
+- A última linha da página é o crédito "Feito com ❤️ por Alexandre Rios" (`CREDITO` em `web/src/ui/page.js`).
 - `?imagens` no fim do link força a versão com imagens estáticas (sem 3D).
 
 ## Segurança

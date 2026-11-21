@@ -42,7 +42,7 @@ export function createPage(stage, dados) {
         h('p', { class: 'pg-it', text: 'Qualquer dúvida, é só chamar a gente.' }),
         zapUrl && h('a', { class: 'btn sec pg-wa', href: zapUrl, target: '_blank', rel: 'noopener noreferrer' }, icone('wa'), h('span', { text: 'Falar no WhatsApp' })))),
     // the very last line of the page: who made it
-    h('p', { class: 'pg-credit' }, 'Feito por ', h('a', { href: CREDITO, target: '_blank', rel: 'noopener noreferrer', text: 'xanderios' })));
+    h('p', { class: 'pg-credit' }, 'Feito com ', h('span', { class: 'pg-heart', text: '❤️' }), ' por ', h('a', { href: CREDITO, target: '_blank', rel: 'noopener noreferrer', text: 'Alexandre Rios' })));
   stage.append(presentes, fim);
   const track = document.getElementById('track');   // the pinned stretch of scroll before the page moves
 
