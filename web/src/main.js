@@ -4,7 +4,7 @@ import { createTilt } from './ui/tilt.js';
 import { createLetter } from './ui/letter.js';
 import './styles/scene.css';
 import { LEVELS, PRESETS, createGovernor, detectLevel, saveChoice, savedChoice } from './quality.js';
-import { nightOf, paintSky, phaseAt } from './scene/sky.js';
+import { nightOf, paintSky, phaseAt, saveSky, savedSky } from './scene/sky.js';
 import { createSettings } from './ui/settings.js';
 
 const $ = (id) => document.getElementById(id);
@@ -57,7 +57,7 @@ async function start() {
   const fill = $('ld-fill'), txt = $('ld-txt');
   const progresso = (f) => { fill.style.width = Math.max(4, Math.round(f * 100)) + '%'; txt.textContent = `Preparando o jardim… ${Math.round(f * 100)}%`; };
   // blue by day, starry by night: the guest's own clock decides, unless they pick one in the cog's menu
-  let ceu = 'auto', pintado = -1;             // ceu: auto | dia | noite
+  let ceu = savedSky() || 'auto', pintado = -1;   // ceu: auto | dia | noite (a pick lasts for this visit)
   const fase = () => (ceu === 'dia' ? 0 : ceu === 'noite' ? 0.5 : phaseAt());   // the sky's phase (see scene/sky.js)
   const pintar = (f) => { pintado = f; paintSky(f); };
   pintar(fase());
@@ -115,6 +115,7 @@ async function start() {
     },
     onSky(v) {                                 // the wheel turns: one leaves to the left, the other rises on the right
       ceu = v;
+      saveSky(v);
       settings.sky(ceu);
       world.setSky?.(fase());
     },

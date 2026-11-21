@@ -10,7 +10,7 @@ LOD = globals().get("LOD", "medium")
 # Sampled from the reference illustration (Image 1) – sRGB hex.
 PAL = {
     # castle
-    "wall": "#F8DBD2", "wall_light": "#FCEAE2", "wall_dark": "#F0C9C0",
+    "wall": "#FBF6F4", "wall_light": "#FFFDFB", "wall_dark": "#F3DCDB",      # near white: the site's warm light turns it rosy
     "roof": "#EE9197", "roof_dark": "#DC747C", "flag": "#F29AA4",
     "gold": "#E2AA43", "glow": "#FFD47E", "glow_soft": "#FFE6B8",
     "wood": "#DDA468", "wood_dark": "#C88E55",

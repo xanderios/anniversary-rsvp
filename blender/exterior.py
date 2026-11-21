@@ -585,6 +585,68 @@ def build_flowers():
 
 
 # ================================================================ sky
+def scenery_bvh(skip=("Terrain", "Sparkle")):
+    """Everything that stands in the scene, for testing what flies against it."""
+    from mathutils.bvhtree import BVHTree
+    bpy.context.view_layer.update()
+    verts, polys = [], []
+    for ob in scene.objects:
+        if ob.type != "MESH" or ob.location.z < -40 or ob.name.startswith(skip):
+            continue
+        base = len(verts)
+        verts.extend(ob.matrix_world @ v.co for v in ob.data.vertices)
+        polys.extend(tuple(base + i for i in pl.vertices) for pl in ob.data.polygons)
+    return BVHTree.FromPolygons(verts, polys)
+
+
+def track_dist(p):
+    """How far a point is from the camera's way."""
+    best = 1e9
+    for a, b in zip(CAM_TRACK, CAM_TRACK[1:]):
+        for lift in (0.0, 1.4):          # on tall, narrow screens the camera walks a little higher
+            a_, b_ = Vector(a) + Vector((0, 0, lift)), Vector(b) + Vector((0, 0, lift))
+            t = max(0.0, min(1.0, (p - a_).dot(b_ - a_) / (b_ - a_).length_squared))
+            best = min(best, (p - (a_ + (b_ - a_) * t)).length)
+    return best
+
+
+FIREFLIES = []      # where each firefly hovers at night (x, y, z): the web export hands the list to world.js
+
+
+def build_fireflies(n=320):
+    """At night fireflies take the butterflies' place. Most hover low over the grass, the flowers and
+    the paving, some higher, up to a metre above the tallest trees; they are thickest beside the walk
+    and in the castle garden. Each keeps to a small patch of air (world.js lets it wander some 0.6 m),
+    clear of everything that stands and of the camera's way."""
+    solid = scenery_bvh(skip=("Terrain", "Sparkle", "Path"))
+    tall = 0.0                                       # how high the tallest tree by the walk stands above its ground
+    for ob in scene.objects:
+        if ob.type == "MESH" and ob.name.startswith(("BlossomTree_", "Cypress_")):
+            box = [ob.matrix_world @ Vector(c) for c in ob.bound_box]
+            cx, cy = sum(c.x for c in box) / 8, sum(c.y for c in box) / 8
+            if abs(cx) < 24.0 and -70.0 < cy < 6.0:
+                tall = max(tall, max(c.z for c in box) - H(cx, cy))
+    low, high = 0.45, tall + 1.0                     # how far above the ground they fly
+    tries = 0
+    while len(FIREFLIES) < n and tries < n * 400:
+        tries += 1
+        if random.random() < 0.6:                    # along the walk
+            y = random.uniform(-64.0, -13.0)
+            x = pc(y) + random.gauss(0.0, 6.0)
+        else:                                        # in the castle garden, up to the walls
+            y = random.uniform(-13.0, -1.3)
+            x = random.gauss(0.0, 7.5)
+        if abs(x) > 19.0:
+            continue
+        ground = max(H(x + dx, y + dy) for dx in (-0.6, 0.0, 0.6) for dy in (-0.6, 0.0, 0.6))
+        p = Vector((x, y, max(ground, 0.08) + low + (high - low) * random.random() ** 2.4))      # more of them low than high
+        if solid.find_nearest(p, 0.8)[0] is not None or track_dist(p) < 2.1:
+            continue
+        if any((p - q).length < 1.1 for q in FIREFLIES):
+            continue
+        FIREFLIES.append(p)
+
+
 def build_butterflies():
     """Butterflies fly long, loose loops (see world.js): centre + (ax sin a, ay cos 0.7a, az cos 1.3a).
     Every loop is tested against all the scenery, so none ever passes through a tree, the castle,
@@ -606,25 +668,7 @@ def build_butterflies():
     wl_t = wing("ButterflyWingL", -1).build(coll=C_SKY, loc=(0, 0, -50))
     wr_t = wing("ButterflyWingR", 1).build(coll=C_SKY, loc=(0, 0, -50))
 
-    from mathutils.bvhtree import BVHTree
-    bpy.context.view_layer.update()
-    verts, polys = [], []
-    for ob in scene.objects:
-        if ob.type != "MESH" or ob.location.z < -40 or ob.name.startswith(("Terrain", "Sparkle")):
-            continue
-        base = len(verts)
-        verts.extend(ob.matrix_world @ v.co for v in ob.data.vertices)
-        polys.extend(tuple(base + i for i in pl.vertices) for pl in ob.data.polygons)
-    solid = BVHTree.FromPolygons(verts, polys)
-
-    def track_dist(p):
-        best = 1e9
-        for a, b in zip(CAM_TRACK, CAM_TRACK[1:]):
-            for lift in (0.0, 1.4):          # on tall, narrow screens the camera walks a little higher
-                a_, b_ = Vector(a) + Vector((0, 0, lift)), Vector(b) + Vector((0, 0, lift))
-                t = max(0.0, min(1.0, (p - a_).dot(b_ - a_) / (b_ - a_).length_squared))
-                best = min(best, (p - (a_ + (b_ - a_) * t)).length)
-        return best
+    solid = scenery_bvh()
 
     def loop_ok(c, amp, reach, walk):
         for k in range(700):
@@ -982,6 +1026,7 @@ build_sky()
 separate_random(build_countryside, 2029)
 separate_random(build_lamps, 2031)
 separate_random(build_butterflies, 2030)
+separate_random(build_fireflies, 2032)
 
 # ---------------------------------------------------------------- light + camera
 sd = bpy.data.lights.new("Sun", "SUN")

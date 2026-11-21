@@ -20,7 +20,7 @@ export function createSettings({ onChoose, onSky }) {
   raiz.hidden = true;
   raiz.innerHTML = `
     <button type="button" class="aj-cog" aria-haspopup="true" aria-expanded="false" aria-controls="aj-menu" aria-label="Ajustes: céu e qualidade da imagem">${COG}</button>
-    <div class="aj-menu" id="aj-menu" hidden>
+    <div class="aj-menu" id="aj-menu" role="group" aria-label="Ajustes" hidden>
       <p class="aj-title" id="aj-t-ceu">Céu</p>
       <div class="aj-ceu" role="radiogroup" aria-labelledby="aj-t-ceu">
         ${CEUS.map(([v, nome, icone]) => `<button type="button" class="aj-seg" role="radio" aria-checked="false" data-ceu="${v}">${icone}<b>${nome}</b></button>`).join('')}

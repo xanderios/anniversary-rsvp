@@ -5,8 +5,8 @@
 // swaps day and night.
 // Everything that costs frame time is scaled by a quality preset (see ../quality.js).
 import {
-  AdditiveBlending, BufferGeometry, CatmullRomCurve3, Color, DirectionalLight, Float32BufferAttribute, Fog, HemisphereLight,
-  Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhongMaterial, PCFShadowMap, PerspectiveCamera, PlaneGeometry,
+  AdditiveBlending, BufferGeometry, CatmullRomCurve3, Color, CustomBlending, DirectionalLight, Float32BufferAttribute, Fog, HemisphereLight,
+  InstancedBufferAttribute, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhongMaterial, OneFactor, OneMinusSrcAlphaFactor, PCFShadowMap, PerspectiveCamera, PlaneGeometry,
   PointLight, Points, Quaternion, SRGBColorSpace, Scene, ShaderMaterial, Vector3, Vector4, WebGLRenderTarget, WebGLRenderer,
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -21,9 +21,9 @@ import hallMed from '../models/hall.glb?url';
 import hallHigh from '../models/hall-high.glb?url';
 
 const MODELS = {
-  low: { garden: gardenLow, hall: hallLow, bytes: [3.4e6, 0.8e6] },
+  low: { garden: gardenLow, hall: hallLow, bytes: [3.5e6, 0.9e6] },
   medium: { garden: gardenMed, hall: hallMed, bytes: [6.1e6, 1.5e6] },
-  high: { garden: gardenHigh, hall: hallHigh, bytes: [6.6e6, 2.6e6] },
+  high: { garden: gardenHigh, hall: hallHigh, bytes: [6.8e6, 2.6e6] },
 };
 const b2t = ([x, y, z]) => new Vector3(x, z, -y); // Blender (Z up) -> three (Y up)
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -32,11 +32,14 @@ const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const wrap = (x) => ((x % 1) + 1) % 1;
 
 // Light by day, at twilight and by night (the sky's own colours are in sky.js, shared with the page).
+// fill: a little light of their own for the castle walls (linear RGB), so their shaded sides stay bright and rosy.
+// fly: the colour of a firefly's light.
 const LIGHT = {
-  day: { hemiSky: 0xfff4f2, hemiGround: 0xf6ddd6, hemi: 2.35, sun: 0xfff1e4, sunI: 1.5 },
-  dusk: { hemiSky: 0xffd6c4, hemiGround: 0xdcaab2, hemi: 1.95, sun: 0xffb486, sunI: 1.2 },
-  dawn: { hemiSky: 0xffdfd4, hemiGround: 0xe2b6c0, hemi: 2.0, sun: 0xffc4a0, sunI: 1.2 },
-  night: { hemiSky: 0xb4c0f2, hemiGround: 0x7377ac, hemi: 1.5, sun: 0xc6d3ff, sunI: 0.8 },
+  day: { hemiSky: 0xfff4f2, hemiGround: 0xf6ddd6, hemi: 2.35, sun: 0xfff1e4, sunI: 1.5, fill: [0.16, 0.1, 0.13] },
+  dusk: { hemiSky: 0xffd6c4, hemiGround: 0xdcaab2, hemi: 1.95, sun: 0xffb486, sunI: 1.2, fill: [0.13, 0.075, 0.09] },
+  dawn: { hemiSky: 0xffdfd4, hemiGround: 0xe2b6c0, hemi: 2.0, sun: 0xffc4a0, sunI: 1.2, fill: [0.14, 0.085, 0.1] },
+  night: { hemiSky: 0xb4c0f2, hemiGround: 0x7377ac, hemi: 1.5, sun: 0xc6d3ff, sunI: 0.8, fill: [0.05, 0.04, 0.07] },
+  fly: [1.0, 0.86, 0.34],
 };
 
 // Where the sun (by day) and the moon (by night) rest: with the cloud up on the right of the castle,
@@ -53,6 +56,44 @@ const HALO = 3.4;                         // the reach of their glow, in radii
 // the upper left, so the lit edge is the lower right one) and how large it is. Flip x to mirror the moon.
 const SHADE = { x: -0.46, y: 0.24, r: 0.93 };
 const TURN = { time: 0.6, speed: 0.17 };  // the wheel: seconds to pick up speed, and turns per second at most
+
+// A firefly, a tenth of a metre long (far bigger than life, as in a picture book), facing +z: head
+// and thorax, two wings, and the lantern at its tail. aPart: 0 body, 1 lantern, 2 and 3 the wings.
+function fireflyGeometry() {
+  const pos = [], nor = [], col = [], part = [];
+  const e1 = new Vector3(), e2 = new Vector3();
+  const tri = (a, b, c, rgb, k) => {
+    e1.subVectors(b, a).cross(e2.subVectors(c, a)).normalize();
+    for (const v of [a, b, c]) { pos.push(v.x, v.y, v.z); nor.push(e1.x, e1.y, e1.z); col.push(...rgb); part.push(k); }
+  };
+  // a five-sided spindle along z through rings [z, radius], tail first; it ends in a point where the radius is 0
+  const spindle = (rings, rgb, k) => {
+    const ring = ([z, r]) => [0, 1, 2, 3, 4].map((i) => new Vector3(Math.cos(i * 1.2566 + 0.3142) * r, Math.sin(i * 1.2566 + 0.3142) * r * 0.85, z));
+    for (let j = 0; j < rings.length - 1; j++) {
+      const a = ring(rings[j]), b = ring(rings[j + 1]);
+      for (let i = 0; i < 5; i++) {
+        const i2 = (i + 1) % 5;
+        if (rings[j][1] > 0) tri(a[i], a[i2], b[i2], rgb, k);
+        if (rings[j + 1][1] > 0) tri(a[i], b[i2], b[i], rgb, k);
+      }
+    }
+  };
+  spindle([[-0.054, 0], [-0.041, 0.013], [-0.018, 0.018], [0.003, 0.015]], [1, 1, 1], 1);         // the lantern
+  spindle([[0.003, 0.015], [0.02, 0.016], [0.035, 0.011]], [0.2, 0.13, 0.11], 0);                 // thorax
+  spindle([[0.035, 0.011], [0.045, 0.01], [0.052, 0]], [0.5, 0.2, 0.17], 0);                      // head
+  for (const sx of [1, -1]) {
+    const h1 = new Vector3(sx * 0.005, 0.014, 0.027), h2 = new Vector3(sx * 0.005, 0.015, 0.004);
+    const tip = new Vector3(sx * 0.036, 0.017, -0.042), mid = new Vector3(sx * 0.033, 0.016, -0.004);
+    const wing = [0.62, 0.6, 0.66], k = sx > 0 ? 2 : 3;
+    if (sx > 0) { tri(h1, mid, h2, wing, k); tri(h2, mid, tip, wing, k); } else { tri(h1, h2, mid, wing, k); tri(h2, tip, mid, wing, k); }
+  }
+  const geo = new BufferGeometry();
+  geo.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new Float32BufferAttribute(nor, 3));
+  geo.setAttribute('aCol', new Float32BufferAttribute(col, 3));
+  geo.setAttribute('aPart', new Float32BufferAttribute(part, 1));
+  return geo;
+}
 
 // `sky` is the phase the scene opens at (see sky.js): 0 = day, 0.5 = night.
 export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart = 0 } = {}) {
@@ -81,28 +122,52 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
   // ---------------------------------------------------------------- materials
   const time = { value: 0 };
   const lampGain = { value: new Color(0, 0, 0) };  // warm light from the lanterns, baked per vertex (uv1.x)
+  const castleFill = { value: new Color(0, 0, 0) };  // the castle walls' own soft light (see LIGHT)
+  // The fireflies shine on what is near them: the few closest to where the camera looks are real
+  // lights (place in view space, brightness), added up in the shader of every lit garden material.
+  const FLY_LIGHTS = preset.fireflyLights ?? 8;
+  const flyLights = { value: Array.from({ length: Math.max(1, FLY_LIGHTS) }, () => new Vector4()) };
+  const flyColor = { value: new Color(0, 0, 0) };
   // Lit garden materials also take the lanterns' baked light, which fades in as night falls.
-  const withLamps = (m, vertexExtra = '') => {
+  // vertex: more vertex code; fill: the surface also glows a little in this colour.
+  const withLamps = (m, { vertex = '', fill = null } = {}) => {
     m.onBeforeCompile = (s) => {
       s.uniforms.uTime = time;
       s.uniforms.uLamp = lampGain;
+      s.uniforms.uFly = flyLights;
+      s.uniforms.uFlyColor = flyColor;
+      if (fill) s.uniforms.uFill = fill;
       s.vertexShader = `uniform float uTime;\n#ifndef USE_UV1\nattribute vec2 uv1;\n#endif\nvarying float vLamp;\n${s.vertexShader}`
-        .replace('#include <begin_vertex>', `#include <begin_vertex>\n vLamp = uv1.x / (1.0 + 0.6 * uv1.x);\n${vertexExtra}`);   // right beside a lantern the light levels off
-      s.fragmentShader = `uniform vec3 uLamp;\nvarying float vLamp;\n${s.fragmentShader}`
-        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += diffuseColor.rgb * uLamp * vLamp;');
+        .replace('#include <begin_vertex>', `#include <begin_vertex>\n vLamp = uv1.x / (1.0 + 0.6 * uv1.x);\n${vertex}`);   // right beside a lantern the light levels off
+      s.fragmentShader = `uniform vec3 uLamp; uniform vec4 uFly[${Math.max(1, FLY_LIGHTS)}]; uniform vec3 uFlyColor;${fill ? ' uniform vec3 uFill;' : ''}\nvarying float vLamp;\n${s.fragmentShader}`
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+          totalEmissiveRadiance += diffuseColor.rgb * (uLamp * vLamp${fill ? ' + uFill' : ''});
+          if (uFlyColor.g > 0.0) {
+            float fly = 0.0;
+            for (int i = 0; i < ${FLY_LIGHTS}; i++) {
+              vec3 d = uFly[i].xyz + vViewPosition;                    // from this point to the firefly
+              float r2 = dot(d, d);
+              fly += uFly[i].w * (0.4 + 0.6 * max(0.0, dot(normal, d) * inversesqrt(r2 + 0.0001))) / (1.0 + 3.0 * r2) * smoothstep(9.0, 1.0, r2);
+            }
+            totalEmissiveRadiance += diffuseColor.rgb * uFlyColor * fly;
+          }`);
     };
+    // each variant is a program of its own (three.js would otherwise take them for the same one)
+    const key = `lamps|${vertex}|${fill ? 'fill' : ''}`;
+    m.customProgramCacheKey = () => key;
     return m;
   };
   const lit = withLamps(new MeshLambertMaterial({ vertexColors: true }));
+  const castle = withLamps(new MeshLambertMaterial({ vertexColors: true }), { fill: castleFill });
   const twoSided = withLamps(new MeshLambertMaterial({ vertexColors: true, side: 2 }));
-  const flowers = withLamps(new MeshLambertMaterial({ vertexColors: true, side: 2 }), `
+  const flowers = withLamps(new MeshLambertMaterial({ vertexColors: true, side: 2 }), { vertex: `
       float ph = uv.y * 6.2832 + position.x * 0.35 + position.z * 0.27;
       float w = uv.x * uv.x * 0.055;
       transformed.x += sin(uTime * 1.5 + ph) * w;
-      transformed.z += cos(uTime * 1.1 + ph * 1.3) * w * 0.7;`);
+      transformed.z += cos(uTime * 1.1 + ph * 1.3) * w * 0.7;` });
   const glow = new MeshBasicMaterial({ vertexColors: true, toneMapped: false });       // castle windows
   const lampGlass = new MeshBasicMaterial({ vertexColors: true, toneMapped: false });  // lantern panes
-  const disposables = [lit, twoSided, flowers, glow, lampGlass];
+  const disposables = [lit, castle, twoSided, flowers, glow, lampGlass];
 
   function dress(root, rules) {
     root.traverse((o) => {
@@ -123,8 +188,9 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
   ext.add(garden.scene);
   dress(garden.scene, [
     [/^W_Ground/, { recv: true }],
-    [/^W_CastleTrim/, { recv: true }],            // windows: no shadow of their own down the wall
-    [/^W_Castle/, { cast: true, recv: true }],
+    [/^W_CastleRoof/, { cast: true, recv: true }],          // not the walls' material: the roofs take no fill light
+    [/^W_CastleTrim/, { mat: castle, recv: true }],   // windows: no shadow of their own down the wall
+    [/^W_Castle/, { mat: castle, cast: true, recv: true }],
     [/^W_Gate/, { cast: true, recv: true }],
     [/^W_Lamps/, { cast: true, recv: true, glow: lampGlass }],
     [/^W_Trees/, { cast: true, recv: true }],
@@ -311,26 +377,134 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
   }, [['position', 3], ['aRnd', 1]], haloMat);
   ext.add(halos);
 
-  // petals drifting down along the path
+  // Fireflies: out at night, when the butterflies are away. Blender chose where each one hovers
+  // (exterior.py, build_fireflies): low over the grass and the flowers, clear of the camera's way.
+  // Each is a little model (see fireflyGeometry) whose lantern glows and dims; a soft glow is drawn
+  // around the lantern, and the nearest ones light the garden (flyLights, above).
+  const flyList = node('W_Ground')?.userData?.fireflies || [];
+  const flyN = Math.min(flyList.length / 3, preset.fireflies ?? 56);
+  const flies = Array.from({ length: flyN }, (_, i) => {
+    const v = b2t([flyList[i * 3], flyList[i * 3 + 1], flyList[i * 3 + 2]]), r = Math.random;
+    return { x: v.x, y: v.y, z: v.z, fx: 0.23 + r() * 0.22, fy: 0.35 + r() * 0.25, fz: 0.2 + r() * 0.22, fb: 0.8 + r() * 1.2,
+      p: [r() * 40, r() * 30, r() * 50, r() * 60, r() * 20, r() * 70], size: 1.5 + r() * 0.7, yaw: r() * 6.2832, tint: r() };
+  });
+  const flyBodyMat = new ShaderMaterial({
+    uniforms: { uTime: time, uShow: { value: 0 } }, side: 2,
+    vertexShader: `attribute vec3 aCol; attribute float aPart; attribute float aGlow; attribute float aSeed;
+      uniform float uTime; uniform float uShow; varying vec3 vCol;
+      void main(){ vec3 p = position, n = normal;
+        if (aPart > 1.5) {                                                                       // the wings beat about their hinges
+          float side = aPart > 2.5 ? -1.0 : 1.0;
+          float a = side * (0.2 + 0.75 * (0.5 + 0.5 * sin(uTime * 58.0 + aSeed * 50.0)));
+          vec2 hinge = vec2(0.005 * side, 0.014);
+          mat2 turn = mat2(cos(a), sin(a), -sin(a), cos(a));
+          p.xy = turn * (p.xy - hinge) + hinge; n.xy = turn * n.xy;
+        }
+        vec3 tint = mix(vec3(1.0, 0.86, 0.3), vec3(0.74, 1.0, 0.34), aSeed);                      // yellow to green
+        float up = normalize(mat3(instanceMatrix) * n).y;
+        float near = smoothstep(0.05, -0.03, p.z);                                                // its own lantern lights its back half
+        vCol = aCol * (0.5 + 0.4 * up) * vec3(0.62, 0.68, 0.95) + aCol * tint * aGlow * (0.5 + 1.8 * near);
+        if (aPart > 0.5 && aPart < 1.5) vCol = tint * (0.4 + 0.8 * aGlow) + vec3(0.6) * aGlow * aGlow;
+        gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(p * uShow, 1.0); }`,
+    fragmentShader: `varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol, 1.0);
+      #include <colorspace_fragment>
+    }`,
+  });
+  const flyGeo = fireflyGeometry();
+  flyGeo.setAttribute('aGlow', new InstancedBufferAttribute(new Float32Array(flyN), 1));
+  flyGeo.setAttribute('aSeed', new InstancedBufferAttribute(Float32Array.from(flies, (f) => f.tint), 1));
+  const fireflies = new InstancedMesh(flyGeo, flyBodyMat, flyN);
+  fireflies.frustumCulled = false;
+  disposables.push(flyGeo, flyBodyMat);
+  ext.add(fireflies);
+  const flyMat = new ShaderMaterial({
+    // its light is added, and a little of what lies behind is taken away: it keeps its colour even in front of a pale wall
+    uniforms: { uPx: { value: 1 }, uHalf: { value: 400 }, uNight: { value: 0 } }, transparent: true, depthWrite: false,
+    blending: CustomBlending, blendSrc: OneFactor, blendDst: OneMinusSrcAlphaFactor,
+    vertexShader: `attribute float aGlow; attribute float aTint; uniform float uPx; uniform float uHalf; varying float vA; varying float vTint; varying float vFar;
+      void main(){ vA = aGlow; vTint = aTint;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;
+        float size = 0.6 * projectionMatrix[1][1] * uHalf / -mv.z;                               // a glow 60 cm across
+        vFar = smoothstep(40.0 * uPx, 12.0 * uPx, size);                                          // too far to make out the body: a dot of light
+        gl_PointSize = clamp(size, 4.0 * uPx, 64.0 * uPx); }`,
+    fragmentShader: `uniform float uNight; varying float vA; varying float vTint; varying float vFar; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0;
+        float core = mix(0.8 * smoothstep(0.22, 0.06, d), smoothstep(0.34, 0.1, d), vFar), halo = pow(max(0.0, 1.0 - d), 2.0);
+        float a = (core + 0.55 * halo) * vA * uNight; if (a < 0.004) discard;
+        vec3 c = mix(vec3(1.0, 0.86, 0.3), vec3(0.74, 1.0, 0.34), vTint) + 0.45 * core;          // paler at the heart
+        gl_FragColor = vec4(c * a, 0.55 * min(1.0, a)); }`,
+  });
+  const flyGlow = points(flyN, (i, p, g, c) => { c[i] = flies[i].tint; }, [['position', 3], ['aGlow', 1], ['aTint', 1]], flyMat);
+  ext.add(flyGlow);
+  const flyNear = new Int16Array(FLY_LIGHTS + 1), flyDist = new Float32Array(FLY_LIGHTS + 1), flyAim = new Vector3(), flyAt = new Vector3();
+  const FLY_PITCH = [Math.cos(-0.5), Math.sin(-0.5)];     // they fly nose up, the lantern hanging
+  function flyFrame(t, dt) {
+    const mats = fireflies.instanceMatrix.array, glows = flyGeo.attributes.aGlow.array;
+    const at = flyGlow.geometry.attributes.position.array, halo = flyGlow.geometry.attributes.aGlow.array;
+    const ease = 1 - Math.exp(-dt * 4), [cp, sp] = FLY_PITCH;
+    flyAim.copy(cam.position).addScaledVector(fwd, 5);     // the lights go to the fireflies nearest to what the camera looks at
+    let found = 0;
+    for (let i = 0; i < flyN; i++) {
+      const f = flies[i], p = f.p;
+      const a1 = t * f.fx + p[0], a2 = t * 0.83 + p[1], a4 = t * f.fz + p[3], a5 = t * 0.71 + p[4];
+      const x = f.x + Math.sin(a1) * 0.42 + Math.sin(a2) * 0.13;                                  // each wanders about its own spot
+      const y = f.y + Math.sin(t * f.fy + p[2]) * 0.2;
+      const z = f.z + Math.cos(a4) * 0.42 + Math.cos(a5) * 0.13;
+      // it turns to where it is going
+      let turn = Math.atan2(Math.cos(a1) * 0.42 * f.fx + Math.cos(a2) * 0.108, -Math.sin(a4) * 0.42 * f.fz - Math.sin(a5) * 0.092) - f.yaw;
+      turn -= Math.round(turn / 6.2832) * 6.2832;
+      f.yaw += turn * ease;
+      const c = Math.cos(f.yaw) * f.size, s = Math.sin(f.yaw) * f.size, o = i * 16;
+      mats[o] = c; mats[o + 1] = 0; mats[o + 2] = -s;
+      mats[o + 4] = s * sp; mats[o + 5] = cp * f.size; mats[o + 6] = c * sp;
+      mats[o + 8] = s * cp; mats[o + 9] = -sp * f.size; mats[o + 10] = c * cp;
+      mats[o + 12] = x; mats[o + 13] = y; mats[o + 14] = z; mats[o + 15] = 1;
+      const glow = 0.22 + 0.78 * smooth(span(Math.sin(t * f.fb + p[5]), [-0.55, 0.6]));          // glows, dims, glows again
+      glows[i] = halo[i] = glow;
+      const lx = x - s * cp * 0.022, ly = y + sp * f.size * 0.022, lz = z - c * cp * 0.022;      // the lantern
+      at[i * 3] = lx; at[i * 3 + 1] = ly; at[i * 3 + 2] = lz;
+      if (!FLY_LIGHTS) continue;
+      const d = (lx - flyAim.x) ** 2 + (ly - flyAim.y) ** 2 + (lz - flyAim.z) ** 2;
+      let j = FLY_LIGHTS;                                    // kept in order of distance, nearest first
+      if (found <= FLY_LIGHTS) j = found++;
+      else if (d >= flyDist[j]) continue;
+      for (; j > 0 && flyDist[j - 1] > d; j--) { flyDist[j] = flyDist[j - 1]; flyNear[j] = flyNear[j - 1]; }
+      flyDist[j] = d; flyNear[j] = i;
+    }
+    fireflies.instanceMatrix.needsUpdate = flyGeo.attributes.aGlow.needsUpdate = true;
+    flyGlow.geometry.attributes.position.needsUpdate = flyGlow.geometry.attributes.aGlow.needsUpdate = true;
+    // one more than there are lights was kept: a light fades to nothing as its firefly becomes the farthest, so none pops in or out
+    const edge = found > FLY_LIGHTS ? Math.sqrt(flyDist[FLY_LIGHTS]) : Infinity;
+    cam.updateMatrixWorld();
+    for (let j = 0; j < FLY_LIGHTS; j++) {
+      const v = flyLights.value[j];
+      if (j >= found) { v.set(0, 0, -1e3, 0); continue; }
+      const i = flyNear[j];
+      flyAt.set(at[i * 3], at[i * 3 + 1], at[i * 3 + 2]).applyMatrix4(cam.matrixWorldInverse);
+      v.set(flyAt.x, flyAt.y, flyAt.z, edge === Infinity ? glows[i] : glows[i] * Math.max(0, Math.min(1, (edge - Math.sqrt(flyDist[j])) / (0.3 * edge + 0.001))));
+    }
+  }
+
+  // petals drifting down along the path, by day only (uShow)
   const petalShader = (range, extra) => new ShaderMaterial({
-    uniforms: { uTime: time, uSize: { value: 1 } }, transparent: true, depthWrite: false,
+    uniforms: { uTime: time, uSize: { value: 1 }, uShow: { value: 1 } }, transparent: true, depthWrite: false,
     vertexShader: `attribute vec3 aRnd; uniform float uTime; uniform float uSize; varying float vR; varying float vA; varying float vTint;
       void main(){ vec3 p = position; ${extra}
         vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv; vTint = aRnd.z;
         gl_PointSize = uSize * (${range}) / -mv.z; }`,
-    fragmentShader: `varying float vR; varying float vA; varying float vTint; void main(){ vec2 q = gl_PointCoord - 0.5; float c = cos(vR), s = sin(vR);
+    fragmentShader: `uniform float uShow; varying float vR; varying float vA; varying float vTint; void main(){ vec2 q = gl_PointCoord - 0.5; float c = cos(vR), s = sin(vR);
         q = vec2(q.x * c - q.y * s, q.x * s + q.y * c); float d = length(q * vec2(1.0, 1.9));
-        float a = smoothstep(0.5, 0.36, d) * vA; if (a < 0.02) discard;
+        float a = smoothstep(0.5, 0.36, d) * vA * uShow; if (a < 0.02) discard;
         gl_FragColor = vec4(mix(vec3(0.985, 0.80, 0.85), vec3(0.99, 0.88, 0.9), vTint), a * 0.92); }`,
   });
   const petMat = petalShader('60.0 + aRnd.x * 50.0', `float t = uTime * (0.35 + aRnd.x * 0.3);
         p.y = mod(p.y - t, 9.0) + 0.2; p.x += sin(t * 1.7 + aRnd.x * 30.0) * 0.7; p.z += cos(t * 1.3 + aRnd.x * 17.0) * 0.5;
         vR = aRnd.x * 6.2832 + t * 2.0; vA = 1.0;`);
   const rnd3 = (i, r) => { r[i * 3] = Math.random(); r[i * 3 + 1] = Math.random(); r[i * 3 + 2] = Math.random(); };
-  ext.add(points(Math.round((mobile ? 130 : 240) * preset.particles), (i, p, r) => {
+  const petals = points(Math.round((mobile ? 130 : 240) * preset.particles), (i, p, r) => {
     p[i * 3] = (Math.random() - 0.5) * 30; p[i * 3 + 1] = Math.random() * 9; p[i * 3 + 2] = -1 + Math.random() * 64;
     rnd3(i, r);
-  }, [['position', 3], ['aRnd', 3]], petMat));
+  }, [['position', 3], ['aRnd', 3]], petMat);
+  ext.add(petals);
 
   // moving parts
   const flagGeo = node('W_Flag_0')?.geometry || null;
@@ -349,7 +523,7 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
       return { m, axis: new Vector3(q.x / s, q.y / s, q.z / s).multiplyScalar(q.w < 0 ? -1 : 1), ang };
     });
     const [ax, ay, az, sp, ph] = root.userData.fly || [1.3, 0.6, 0.4, 0.4, i * 1.9];
-    butterflies.push({ root, wings, base: root.position.clone(), q0: root.quaternion.clone(), ax, ay, az, sp, ph });
+    butterflies.push({ root, wings, base: root.position.clone(), q0: root.quaternion.clone(), size: root.scale.x, ax, ay, az, sp, ph });
   }
   const clouds = [0, 1, 2, 3].map((i) => node(`W_Cloud_${i}`)).filter(Boolean).map((m, i) => ({ m, base: m.position.clone(), ph: i * 2.3 }));
 
@@ -434,7 +608,7 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
   // `goal`. Everything the hour changes is set from it: sky, haze, light, lanterns, stars.
   const cA = new Color(), cB = new Color();
   const mix = (a, b, t) => cA.set(a).lerp(cB.set(b), t);
-  let phase = wrap(skyAtStart), goal = phase, turning = 0, topSpeed = TURN.speed, nightNow = 0, painted = -1;
+  let phase = wrap(skyAtStart), goal = phase, turning = 0, topSpeed = TURN.speed, nightNow = 0, painted = -1, flying = true, glowing = false;
   function paint() {
     painted = phase;
     const n = nightNow = nightOf(phase), tw = twilightOf(phase), S = SKY[tw], L = LIGHT[tw];
@@ -446,6 +620,7 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
     hemi.intensity = through([LIGHT.day.hemi, L.hemi, LIGHT.night.hemi], n, lerp);
     sun.color.copy(through([LIGHT.day.sun, L.sun, LIGHT.night.sun], n, mix));
     sun.intensity = through([LIGHT.day.sunI, L.sunI, LIGHT.night.sunI], n, lerp);
+    castleFill.value.setRGB(...[0, 1, 2].map((i) => through([LIGHT.day.fill[i], L.fill[i], LIGHT.night.fill[i]], n, lerp)));
     const lamps = smooth(span(n, [0.2, 0.85])), dark = smooth(span(n, [0.4, 1]));   // lanterns come on at dusk; stars wait for the dark
     lampGain.value.setRGB(1.0, 0.7, 0.4).multiplyScalar(1.1 * lamps);
     lampGlass.color.setRGB(lerp(0.9, 1.35, lamps), lerp(0.88, 1.2, lamps), lerp(0.82, 0.92, lamps));
@@ -454,6 +629,16 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
     sparkMat.uniforms.uGain.value = lerp(0.85, 1, n);
     stars.visible = dark > 0.01;
     halos.visible = lamps > 0.01;
+    // butterflies and falling petals by day; as night falls they go, and the fireflies come out in their place
+    const day = 1 - smooth(span(n, [0.15, 0.55])), out = smooth(span(n, [0.45, 1]));
+    flying = day > 0.001;
+    for (const b of butterflies) { b.root.visible = flying; b.root.scale.setScalar(b.size * day); }
+    petMat.uniforms.uShow.value = day;
+    petals.visible = flying;
+    glowing = out > 0.001;
+    flyMat.uniforms.uNight.value = flyBodyMat.uniforms.uShow.value = out;
+    flyColor.value.setRGB(...LIGHT.fly).multiplyScalar(3.0 * out);
+    fireflies.visible = flyGlow.visible = glowing;
   }
   // Turn the wheel to a phase: smoothly (the sun or the moon leaves to the left as the other one
   // rises on the right), or at once.
@@ -516,6 +701,8 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
     const px = renderer.getPixelRatio() * Math.min(1.6, Math.max(0.8, h / 800));
     sparkMat.uniforms.uSize.value = starMat.uniforms.uSize.value = haloMat.uniforms.uSize.value = px;
     petMat.uniforms.uSize.value = hallPetMat.uniforms.uSize.value = px * (h / 800);
+    flyMat.uniforms.uPx.value = renderer.getPixelRatio();
+    flyMat.uniforms.uHalf.value = h * renderer.getPixelRatio() / 2;
     if (mirror) {
       const mw = Math.max(64, Math.round(w * renderer.getPixelRatio() * preset.reflection)), mh = Math.max(64, Math.round(h * renderer.getPixelRatio() * preset.reflection));
       mirror.setSize(mw, mh);
@@ -658,7 +845,7 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
         gateGlow.intensity = g * 16;
         renderer.shadowMap.needsUpdate = shadows;
       }
-      for (const b of butterflies) {
+      if (flying) for (const b of butterflies) {
         const a = t * b.sp + b.ph;
         b.root.position.set(b.base.x + Math.sin(a) * b.ax, b.base.y + Math.cos(a * 1.3) * b.az, b.base.z - Math.cos(a * 0.7) * b.ay);
         // turn into the direction of flight (sideways speed), a little nose-up when climbing
@@ -667,6 +854,7 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
         const flap = 0.2 + 1.15 * Math.abs(Math.sin(t * 7 + b.ph));
         for (const wg of b.wings) wg.m.quaternion.copy(qTmp.setFromAxisAngle(wg.axis, wg.ang * flap));
       }
+      if (glowing) flyFrame(t, dt);
       for (const c of clouds) c.m.position.x = c.base.x + Math.sin(t * 0.06 + c.ph) * 1.4;
       if (flagGeo) {
         const a = flagGeo.attributes.position.array;

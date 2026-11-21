@@ -7,10 +7,11 @@ export const LEVELS = ['low', 'medium', 'high'];
 // drawn per CSS pixel. minScale: how far the governor may shrink that. shadow: size of the sun's
 // shadow map (0 = baked shade only). particles: petals and stars, relative to medium.
 // reflection: size of the hall floor's mirror image relative to the screen (0 = none).
+// fireflies: how many come out at night. fireflyLights: how many of them light the garden around them at a time.
 export const PRESETS = {
-  low: { models: 'low', pixelRatio: 1.25, minScale: 0.6, antialias: false, shadow: 0, shadowMobile: 0, particles: 0.4, reflection: 0, gateLight: false },
-  medium: { models: 'medium', pixelRatio: 2, minScale: 0.6, antialias: true, shadow: 4096, shadowMobile: 2048, particles: 1, reflection: 0.35, gateLight: true },
-  high: { models: 'high', pixelRatio: 3, minScale: 0.7, antialias: true, shadow: 4096, shadowMobile: 4096, particles: 1.6, reflection: 0.6, gateLight: true },
+  low: { models: 'low', pixelRatio: 1.25, minScale: 0.6, antialias: false, shadow: 0, shadowMobile: 0, particles: 0.4, reflection: 0, gateLight: false, fireflies: 48, fireflyLights: 4 },
+  medium: { models: 'medium', pixelRatio: 2, minScale: 0.6, antialias: true, shadow: 4096, shadowMobile: 2048, particles: 1, reflection: 0.35, gateLight: true, fireflies: 56, fireflyLights: 8 },
+  high: { models: 'high', pixelRatio: 3, minScale: 0.7, antialias: true, shadow: 4096, shadowMobile: 4096, particles: 1.6, reflection: 0.6, gateLight: true, fireflies: 64, fireflyLights: 12 },
 };
 
 const KEY = 'convite:qualidade';

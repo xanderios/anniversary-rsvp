@@ -43,23 +43,26 @@ npm start                 # http://localhost:3000 (ou a PORT do .env)
   `/benchmarks`) e escolhe uma de três versões da cena: **baixa**, **média** ou **alta**. Depois acompanha os quadros
   por segundo: se cair abaixo de 50, desenha menos pixels; se ainda assim não bastar, passa para a versão mais leve.
 - A engrenagem no canto superior direito deixa o convidado escolher (Automática, Alta, Média, Baixa). A escolha fica
-  guardada no aparelho.
+  guardada no aparelho. No mesmo menu fica a escolha entre dia e noite (veja abaixo).
 - O que cada versão desenha está em `web/src/quality.js` (`PRESETS`).
 - Para testar: `?q=low`, `?q=medium`, `?q=high` no fim do link.
 
 ## Dia e noite
 
-O céu segue o relógio de quem abre o convite: azul de dia, com o sol saindo de trás da nuvem à direita do castelo; à
-noite, a lua minguante ao lado da mesma nuvem, estrelas, estrelas cadentes e os postes acesos (amanhecer das 5h30 às 6h30, anoitecer das 17h30 às 18h30).
-Para testar: `?ceu=noite`, `?ceu=dia` ou `?hora=18`.
+O céu segue o relógio de quem abre o convite: azul de dia, com o sol saindo de trás da nuvem à direita do castelo,
+borboletas e pétalas caindo; à noite, a lua minguante ao lado da mesma nuvem, estrelas, estrelas cadentes, os postes
+acesos e vaga-lumes no lugar das borboletas, sem pétalas do lado de fora (amanhecer das 5h30 às 6h30, anoitecer das
+17h30 às 18h30). Para testar: `?ceu=noite`, `?ceu=dia` ou `?hora=18`.
 
-- A engrenagem também deixa escolher o céu: **Relógio** (o padrão), **Dia** ou **Noite**. A escolha vale só para aquela
-  visita; ao abrir de novo, o convite volta a seguir o relógio.
+- A engrenagem também deixa escolher o céu: **Relógio** (o padrão), **Dia** ou **Noite**. A escolha vale para aquela
+  visita; na seguinte, o relógio volta a decidir.
 - O sol e a lua acompanham essa nuvem durante todo o passeio; a lua fica um pouco acima e à direita dela (`REST`).
 - Ao trocar, o sol e a lua giram na mesma roda, sempre para a esquerda: um se põe à esquerda enquanto o outro nasce à
   direita, e a luz passa por um crepúsculo rosado no meio do caminho. Cores do céu em `web/src/scene/sky.js` (`SKY`),
   luz em `LIGHT` e posição, tamanho, desenho da lua e velocidade em `REST`, `BODY`, `MOON`, `SHADE` e `TURN`, no começo
   de `web/src/scene/world.js`. O sol e a lua são figuras planas (um disco e um crescente), desenhadas pela própria cena.
+- Os vaga-lumes são modelinhos (`fireflyGeometry` em `web/src/scene/world.js`) com a lanterna acesa, e os mais próximos
+  de onde a câmera olha iluminam de verdade o que está em volta.
 
 ## Modelos 3D
 
@@ -75,7 +78,7 @@ npm run build
 ```
 
 O percurso da câmera fica em `web/src/scene/journey.js`; `CAM_TRACK` em `blender/exterior.py` repete os mesmos pontos
-para que nada (árvores, arbustos, postes, borboletas) fique no caminho da câmera.
+para que nada (árvores, arbustos, postes, borboletas, vaga-lumes) fique no caminho da câmera.
 
 As imagens estáticas (`web/public/stills`, usadas com `?imagens`, sem WebGL ou com "reduzir movimento" ligado) são
 desenhadas pela própria cena, de dia e de noite, deitadas e em pé. Para refazê-las depois de mudar os modelos: com
