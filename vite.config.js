@@ -14,10 +14,12 @@ const rotas = () => ({
   },
 });
 
+const API = `http://127.0.0.1:${process.env.API_PORT || 3000}`; // dev: where `npm run dev` listens
+
 export default defineConfig({
   root: 'web',
   plugins: [rotas()],
-  server: { proxy: { '/api': 'http://127.0.0.1:3000', '^/c/[^/]+/evento\\.ics$': 'http://127.0.0.1:3000' } },
+  server: { proxy: { '/api': API, '^/c/[^/]+/evento\\.ics$': API } },
   build: {
     outDir: '../dist',
     emptyOutDir: true,
