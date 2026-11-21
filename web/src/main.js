@@ -2,6 +2,10 @@ import './styles/app.css';
 import { ARRIVE, CAPTIONS, LEAVE, SWAP, TRACK_SCREENS, fadeAt } from './scene/journey.js';
 import { createTilt } from './ui/tilt.js';
 import { createLetter } from './ui/letter.js';
+import './styles/scene.css';
+import { LEVELS, PRESETS, createGovernor, detectLevel, saveChoice, savedChoice } from './quality.js';
+import { nightAt, paintSky } from './scene/sky.js';
+import { createSettings } from './ui/settings.js';
 
 const $ = (id) => document.getElementById(id);
 const token = location.pathname.split('/')[2] || '';
@@ -52,13 +56,28 @@ async function start() {
   // ---- the journey renderer: real-time 3D, or still renders as a fallback
   const fill = $('ld-fill'), txt = $('ld-txt');
   const progresso = (f) => { fill.style.width = Math.max(4, Math.round(f * 100)) + '%'; txt.textContent = `Preparando o jardim… ${Math.round(f * 100)}%`; };
-  let world = null;
+  paintSky(nightAt());                       // blue by day, starry by night: the guest's own clock decides
+  let world = null, createWorld = null;
+  let escolha = savedChoice(), nivel = null, detectado = null, trocando = false;   // escolha: auto | low | medium | high
+  const marcar = () => { LEVELS.forEach((l) => document.body.classList.toggle('q-' + l, l === nivel)); };
   if (webglOk() && !calmo && !soImagens) {
     try {
-      const { createWorld } = await import('./scene/world.js');
-      world = await createWorld($('gl'), progresso);
+      ({ createWorld } = await import('./scene/world.js'));
+      detectado = await detectLevel();
+      nivel = escolha === 'auto' ? detectado : escolha;
+      try {
+        world = await createWorld($('gl'), progresso, { preset: PRESETS[nivel], night: nightAt() });
+      } catch (e) {
+        if (nivel === 'low') throw e;
+        console.warn('Cena 3D pesada demais para este aparelho; usando a versão leve.', e);
+        const novo = $('gl').cloneNode(false);   // a canvas keeps its first context: start over on a fresh one
+        $('gl').replaceWith(novo);
+        nivel = 'low';
+        world = await createWorld(novo, progresso, { preset: PRESETS.low, night: nightAt() });
+      }
     } catch (e) {
       console.warn('3D indisponível, usando imagens.', e);
+      world = null; nivel = null;
     }
   }
   if (!world) {
@@ -66,6 +85,63 @@ async function start() {
     const { createStills } = await import('./scene/stills.js');
     world = createStills($('stills'));
     await world.ready;
+  }
+  marcar();
+
+  // ---- quality: the cog's menu, and the governor that keeps the frame rate up
+  let quadro = null, pagina = 0;               // quadro(): what the scene is showing right now, as frame() arguments
+  const governor = createGovernor({
+    onScale: (s) => world.setScale?.(s),
+    onDrop: () => {                            // still slow at the lowest resolution: one preset down
+      const i = LEVELS.indexOf(nivel);
+      if (escolha !== 'auto' || i <= 0 || trocando) return false;
+      trocar(LEVELS[i - 1]);
+      return true;
+    },
+  });
+  const settings = nivel ? createSettings({
+    onChoose(v) {
+      if (trocando || v === escolha) return;
+      escolha = v;
+      saveChoice(v);
+      const alvoNivel = v === 'auto' ? detectado : v;
+      if (alvoNivel !== nivel) trocar(alvoNivel);
+      else { governor.reset(PRESETS[nivel].minScale, escolha === 'auto'); settings.update({ choice: escolha, level: nivel }); }
+    },
+  }) : null;
+  // Changing preset loads that preset's models into a second canvas, then swaps the two on one frame.
+  async function trocar(novoNivel) {
+    if (trocando || !createWorld || novoNivel === nivel) return;
+    trocando = true;
+    settings?.update({ choice: escolha, level: nivel, busy: true });
+    governor.pause(60);
+    const antigo = $('gl'), novo = document.createElement('canvas');
+    novo.className = 'gl-next';
+    novo.setAttribute('aria-hidden', 'true');
+    antigo.before(novo);                       // underneath the current one until it is ready
+    try {
+      const outro = await createWorld(novo, null, { preset: PRESETS[novoNivel], night: nightAt() });
+      if (quadro) outro.frame(...quadro());
+      const velho = world;
+      world = outro;
+      nivel = novoNivel;
+      antigo.remove();
+      novo.id = 'gl';
+      novo.className = '';
+      velho.dispose?.();
+      marcar();
+    } catch (e) {
+      console.warn('Não foi possível mudar a qualidade.', e);
+      novo.remove();
+    }
+    trocando = false;
+    governor.reset(PRESETS[nivel].minScale, escolha === 'auto');
+    settings?.update({ choice: escolha, level: nivel });
+  }
+  if (nivel) {
+    governor.reset(PRESETS[nivel].minScale, escolha === 'auto');
+    settings.update({ choice: escolha, level: nivel });
+    setInterval(() => { const n = nightAt(); paintSky(n); world.setNight?.(n); }, 60000);
   }
   progresso(1);
   txt.textContent = 'Tudo pronto';
@@ -181,14 +257,18 @@ async function start() {
 
   const suave = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
   let p = 0, antes = performance.now(), chegou = false, timer = 0, salao = false, some = -1;
+  quadro = () => [p, 0, tilt.state, pagina];
   function loop(agora) {
-    const dt = Math.min(0.05, (agora - antes) / 1000);
+    const real = (agora - antes) / 1000, dt = Math.min(0.05, real);
     antes = agora;
-    const a = alvo();
+    governor.tick(real);
+    const a = aberto ? 1 : alvo(); // once the letter is open the journey stays in the hall
     p += (a - p) * (1 - Math.exp(-dt * (calmo ? 30 : 5)));
     if (Math.abs(a - p) < 0.0004) p = a;
 
-    const noSalao = world.frame(p, dt, tilt.state);
+    const page = letter.tick(dt); // 0 until the letter is open, then the open page's scroll progress, 0 (top) to 1 (bottom)
+    const noSalao = world.frame(p, dt, tilt.state, page);
+    pagina = page;
     if (noSalao !== salao) { salao = noSalao; document.body.classList.toggle('in-hall', salao); }
     fade.style.opacity = fadeAt(p).toFixed(3);
 
@@ -227,6 +307,7 @@ async function start() {
   rail.classList.add('gone');
   assentar();
   $('loader').classList.add('done');
+  settings?.show();
   intro.classList.add('on');
   document.body.classList.remove('locked');
   requestAnimationFrame((t) => { antes = t; loop(t); });

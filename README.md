@@ -17,7 +17,10 @@ npm start                 # http://localhost:3000 (ou a PORT do .env)
 - Convites e respostas ficam em `data/convites.json`. Faça backup desse arquivo. Ele também pode ser editado à mão:
   basta acrescentar `{ "nome": "Família Tal" }` à lista e o servidor cria o link.
 - Respostas podem ser dadas e alteradas até o fim do dia 7 de janeiro (`prazo` em `config/evento.json`; sem ele vale `prazoHorasAntes`, em horas antes da festa).
-- Dados da festa: `config/evento.json`.
+- Dados da festa: `config/evento.json` (o servidor lê o arquivo ao iniciar: reinicie depois de editar).
+  Opcionais, para a página que aparece depois da carta: `contato.whatsapp` (só dígitos, com DDI: botão "Falar no WhatsApp") e
+  `presentes` (`itens`: lista de `{ "nome", "obs", "url" }`; `pix`: chave PIX) para as sugestões de presente. Sem um campo,
+  a parte correspondente some. Os valores que estão lá são exemplos: troque antes de enviar os convites.
 - `?imagens` no fim do link força a versão com imagens estáticas (sem 3D).
 
 ## Segurança

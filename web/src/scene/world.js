@@ -1,33 +1,54 @@
-// The 3D world: garden + castle (exterior) and the party hall (interior), both exported
-// from Blender with colour and soft occlusion baked into vertex colours.
+// The 3D world: garden + castle (exterior) and the party hall (interior), both exported from
+// Blender. The garden carries colour and soft occlusion in its vertex colours and is lit live
+// (sun or moon, sky); the hall's light is baked entirely (Cycles) and is drawn unlit.
+// Everything that costs frame time is scaled by a quality preset (see ../quality.js).
 import {
-  AdditiveBlending, BufferGeometry, CatmullRomCurve3, DirectionalLight, Float32BufferAttribute, Fog, HemisphereLight,
-  Matrix4, MeshBasicMaterial, MeshLambertMaterial, MeshPhongMaterial, PCFShadowMap, PerspectiveCamera, PointLight, Points,
-  Quaternion, Scene, ShaderMaterial, Vector3, WebGLRenderer,
+  AdditiveBlending, BufferGeometry, CatmullRomCurve3, Color, DirectionalLight, Float32BufferAttribute, Fog, HemisphereLight,
+  Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhongMaterial, PCFShadowMap, PerspectiveCamera, PlaneGeometry,
+  PointLight, Points, Quaternion, SRGBColorSpace, Scene, ShaderMaterial, Vector3, WebGLRenderTarget, WebGLRenderer,
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { GATE, GATE_ANGLE, HALL, KEYS, SWAP, fovFor, lensTan, monotone, smooth, span } from './journey.js';
-import gardenUrl from '../models/garden.glb?url';
-import hallUrl from '../models/hall.glb?url';
+import { SKY } from './sky.js';
+import gardenLow from '../models/garden-low.glb?url';
+import gardenMed from '../models/garden.glb?url';
+import gardenHigh from '../models/garden-high.glb?url';
+import hallLow from '../models/hall-low.glb?url';
+import hallMed from '../models/hall.glb?url';
+import hallHigh from '../models/hall-high.glb?url';
 
+const MODELS = {
+  low: { garden: gardenLow, hall: hallLow, bytes: [3.4e6, 0.8e6] },
+  medium: { garden: gardenMed, hall: hallMed, bytes: [6.1e6, 1.5e6] },
+  high: { garden: gardenHigh, hall: hallHigh, bytes: [6.6e6, 2.6e6] },
+};
 const b2t = ([x, y, z]) => new Vector3(x, z, -y); // Blender (Z up) -> three (Y up)
 const lerp = (a, b, t) => a + (b - a) * t;
 
-export async function createWorld(canvas, onProgress) {
-  const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+// Light by day and by night (the sky's own colours are in sky.js, shared with the page).
+const LIGHT = {
+  day: { hemiSky: 0xfff4f2, hemiGround: 0xf6ddd6, hemi: 2.35, sun: 0xfff1e4, sunI: 1.5 },
+  night: { hemiSky: 0xb4c0f2, hemiGround: 0x7377ac, hemi: 1.5, sun: 0xc6d3ff, sunI: 0.8 },
+};
+
+export async function createWorld(canvas, onProgress, { preset, night = 0 } = {}) {
+  const renderer = new WebGLRenderer({ canvas, antialias: preset.antialias, alpha: false, stencil: false, powerPreference: 'high-performance' });
   const mobile = matchMedia('(pointer: coarse)').matches;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.shadowMap.enabled = true;
+  let scale = 1;                                   // the governor lowers this when frames run late
+  const pixelRatio = () => Math.max(0.5, Math.min(window.devicePixelRatio || 1, preset.pixelRatio) * scale);
+  renderer.setPixelRatio(pixelRatio());
+  const shadows = preset.shadow > 0;
+  renderer.shadowMap.enabled = shadows;
   renderer.shadowMap.type = PCFShadowMap;
   renderer.shadowMap.autoUpdate = false;
 
   // ---------------------------------------------------------------- load
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const sizes = { garden: 5.7e6, hall: 1.38e6 }, got = { garden: 0, hall: 0 };
+  const files = MODELS[preset.models] || MODELS.medium;
+  const sizes = { garden: files.bytes[0], hall: files.bytes[1] }, got = { garden: 0, hall: 0 };
   const report = () => onProgress?.(Math.min(1, (got.garden + got.hall) / (sizes.garden + sizes.hall)));
-  const urls = { garden: gardenUrl, hall: hallUrl };
-  const load = (name) => loader.loadAsync(urls[name], (e) => {
+  const load = (name) => loader.loadAsync(files[name], (e) => {
     if (e.total) sizes[name] = e.total;
     got[name] = e.loaded;
     report();
@@ -36,51 +57,53 @@ export async function createWorld(canvas, onProgress) {
 
   // ---------------------------------------------------------------- materials
   const time = { value: 0 };
-  const lit = new MeshLambertMaterial({ vertexColors: true });
-  const glow = new MeshBasicMaterial({ vertexColors: true, toneMapped: false });
-  const twoSided = new MeshLambertMaterial({ vertexColors: true, side: 2 });
-
-  const flowers = new MeshLambertMaterial({ vertexColors: true, side: 2 });
-  flowers.onBeforeCompile = (s) => {
-    s.uniforms.uTime = time;
-    s.vertexShader = 'uniform float uTime;\n' + s.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+  const lampGain = { value: new Color(0, 0, 0) };  // warm light from the lanterns, baked per vertex (uv1.x)
+  // Lit garden materials also take the lanterns' baked light, which fades in as night falls.
+  const withLamps = (m, vertexExtra = '') => {
+    m.onBeforeCompile = (s) => {
+      s.uniforms.uTime = time;
+      s.uniforms.uLamp = lampGain;
+      s.vertexShader = `uniform float uTime;\n#ifndef USE_UV1\nattribute vec2 uv1;\n#endif\nvarying float vLamp;\n${s.vertexShader}`
+        .replace('#include <begin_vertex>', `#include <begin_vertex>\n vLamp = uv1.x / (1.0 + 0.6 * uv1.x);\n${vertexExtra}`);   // right beside a lantern the light levels off
+      s.fragmentShader = `uniform vec3 uLamp;\nvarying float vLamp;\n${s.fragmentShader}`
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += diffuseColor.rgb * uLamp * vLamp;');
+    };
+    return m;
+  };
+  const lit = withLamps(new MeshLambertMaterial({ vertexColors: true }));
+  const twoSided = withLamps(new MeshLambertMaterial({ vertexColors: true, side: 2 }));
+  const flowers = withLamps(new MeshLambertMaterial({ vertexColors: true, side: 2 }), `
       float ph = uv.y * 6.2832 + position.x * 0.35 + position.z * 0.27;
       float w = uv.x * uv.x * 0.055;
       transformed.x += sin(uTime * 1.5 + ph) * w;
       transformed.z += cos(uTime * 1.1 + ph * 1.3) * w * 0.7;`);
-  };
-  const balloons = new MeshPhongMaterial({ vertexColors: true, shininess: 55, specular: 0x4a3a3a });
-  balloons.onBeforeCompile = (s) => {
-    s.uniforms.uTime = time;
-    s.vertexShader = 'uniform float uTime;\n' + s.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-      float bob = sin(uTime * 0.9 + position.y * 0.8 + position.x * 0.5);
-      transformed.x += bob * 0.05;
-      transformed.y += cos(uTime * 0.7 + position.y * 0.6) * 0.035;`);
-  };
+  const glow = new MeshBasicMaterial({ vertexColors: true, toneMapped: false });       // castle windows
+  const lampGlass = new MeshBasicMaterial({ vertexColors: true, toneMapped: false });  // lantern panes
+  const disposables = [lit, twoSided, flowers, glow, lampGlass];
 
   function dress(root, rules) {
     root.traverse((o) => {
       if (!o.isMesh) return;
-      const rule = rules.find(([re]) => re.test(o.name) || re.test(o.parent?.name || '')) || [null, {}];
-      const r = rule[1];
+      const r = (rules.find(([re]) => re.test(o.name) || re.test(o.parent?.name || '')) || [null, {}])[1];
       const isGlow = o.material?.name === 'GLOW';
-      o.material = isGlow ? glow : r.mat || lit;
-      o.castShadow = !isGlow && !!r.cast;
-      o.receiveShadow = !isGlow && !!r.recv;
+      o.material = isGlow ? r.glow || glow : r.mat || lit;
+      o.castShadow = shadows && !isGlow && !!r.cast;
+      o.receiveShadow = shadows && !isGlow && !!r.recv;
       o.frustumCulled = r.cull !== false;
+      disposables.push(o.geometry);
     });
   }
 
   // ---------------------------------------------------------------- exterior
   const ext = new Scene();
-  // Far land melts into the sky, so the garden has no edge. The colour sits between the two
-  // ends of the page's sky gradient (see #sky in app.css).
-  ext.fog = new Fog(0xfbdae0, KEYS[0].fog[0], KEYS[0].fog[1]);
+  ext.fog = new Fog(0xffffff, KEYS[0].fog[0], KEYS[0].fog[1]);   // far land melts into the horizon
   ext.add(garden.scene);
   dress(garden.scene, [
     [/^W_Ground/, { recv: true }],
+    [/^W_CastleTrim/, { recv: true }],            // windows: no shadow of their own down the wall
     [/^W_Castle/, { cast: true, recv: true }],
     [/^W_Gate/, { cast: true, recv: true }],
+    [/^W_Lamps/, { cast: true, recv: true, glow: lampGlass }],
     [/^W_Trees/, { cast: true, recv: true }],
     [/^W_Flowers/, { mat: flowers, cast: true, cull: false }],
     [/^W_Flag/, { mat: twoSided }],
@@ -90,16 +113,40 @@ export async function createWorld(canvas, onProgress) {
   const node = (n) => garden.scene.getObjectByName(n);
   const gateL = node('W_Gate_L'), gateR = node('W_Gate_R');
 
-  ext.add(new HemisphereLight(0xfff4f2, 0xf6ddd6, 2.35));
-  const sun = new DirectionalLight(0xfff1e4, 1.5);
+  // The sky itself, drawn behind everything (the canvas is opaque: cheaper to composite). Its colour
+  // depends on how high each pixel looks: the horizon has exactly the fog's colour, so far land
+  // melts into it wherever the camera points, and it deepens towards the top of the sky.
+  const skyGeo = new BufferGeometry();
+  skyGeo.setAttribute('position', new Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3));
+  const skyMat = new ShaderMaterial({
+    depthTest: false, depthWrite: false, fog: false,
+    uniforms: { uTop: { value: new Color() }, uBottom: { value: new Color() }, uInvProj: { value: new Matrix4() } },
+    vertexShader: `uniform mat4 uInvProj; varying vec3 vDir;
+      void main(){ vec4 v = uInvProj * vec4(position.xy, 1.0, 1.0); vDir = transpose(mat3(viewMatrix)) * (v.xyz / v.w); gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+    fragmentShader: `uniform vec3 uTop; uniform vec3 uBottom; varying vec3 vDir;
+      void main(){ float up = normalize(vDir).y; float t = smoothstep(0.0, 0.5, up); t = t * (2.0 - t);
+        float grain = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;     // hides banding in the gradient
+        gl_FragColor = vec4(mix(uBottom, uTop, t) + grain / 255.0, 1.0);
+        #include <colorspace_fragment>
+      }`,
+  });
+  const sky = new Mesh(skyGeo, skyMat);
+  sky.frustumCulled = false;
+  sky.renderOrder = -100;
+  ext.add(sky);
+  disposables.push(skyGeo, skyMat);
+
+  const hemi = new HemisphereLight(0xffffff, 0xffffff, 1);
+  ext.add(hemi);
+  const sun = new DirectionalLight(0xffffff, 1);
   const sunDir = new Vector3(-0.42, 0.71, 0.57).normalize();
   // One still shadow map over the castle garden and the whole walk (x, height, depth in metres).
   const lit0 = new Vector3(-34, -0.5, -13), lit1 = new Vector3(34, 15.5, 67);
   const mid = lit0.clone().add(lit1).multiplyScalar(0.5);
   sun.position.copy(mid).addScaledVector(sunDir, 120);
   sun.target.position.copy(mid);
-  sun.castShadow = true;
-  {
+  sun.castShadow = shadows;
+  if (shadows) {
     const view = new Matrix4().lookAt(sun.position, mid, new Vector3(0, 1, 0)).setPosition(sun.position).invert();
     const lo = new Vector3(Infinity, Infinity, Infinity), hi = new Vector3(-Infinity, -Infinity, -Infinity), c = new Vector3();
     for (let i = 0; i < 8; i++) {
@@ -108,61 +155,108 @@ export async function createWorld(canvas, onProgress) {
     }
     const sc = sun.shadow.camera;
     sc.left = lo.x; sc.right = hi.x; sc.bottom = lo.y; sc.top = hi.y; sc.near = -hi.z - 2; sc.far = -lo.z + 2;
-    const cap = renderer.capabilities.maxTextureSize, big = Math.min(cap, mobile ? 2048 : 4096);
+    const big = Math.min(renderer.capabilities.maxTextureSize, mobile ? preset.shadowMobile : preset.shadow);
     const w = hi.x - lo.x, h = hi.y - lo.y;
     sun.shadow.mapSize.set(w > h ? big : big / 2, h >= w ? big : big / 2);
     if (Math.max(w, h) / Math.min(w, h) < 1.5) sun.shadow.mapSize.set(big, big);
+    sun.shadow.radius = (mobile ? 4 : 7) * (big / (mobile ? 2048 : 4096));
+    sun.shadow.bias = -0.0006;
+    sun.shadow.normalBias = 0.05;
   }
-  sun.shadow.radius = mobile ? 4 : 7;
-  sun.shadow.bias = -0.0006;
-  sun.shadow.normalBias = 0.05;
   ext.add(sun, sun.target);
   const gateGlow = new PointLight(0xffe2b8, 0, 9, 1.8);
   gateGlow.position.copy(b2t([0.6, 1.2, 1.9]));
-  ext.add(gateGlow);
+  if (preset.gateLight) ext.add(gateGlow);
 
-  // sparkles in the sky
-  const SPARK = 90, sp = new Float32Array(SPARK * 3), sr = new Float32Array(SPARK);
-  for (let i = 0; i < SPARK; i++) {
-    sp[i * 3] = (Math.random() - 0.5) * 90; sp[i * 3 + 1] = 2 + Math.random() * 34; sp[i * 3 + 2] = -14 - Math.random() * 10;
-    sr[i] = Math.random();
-  }
-  const sparkGeo = new BufferGeometry();
-  sparkGeo.setAttribute('position', new Float32BufferAttribute(sp, 3));
-  sparkGeo.setAttribute('aRnd', new Float32BufferAttribute(sr, 1));
+  const points = (n, fill, attrs, mat) => {
+    const geo = new BufferGeometry(), arrays = attrs.map(([, size]) => new Float32Array(n * size));
+    for (let i = 0; i < n; i++) fill(i, ...arrays);
+    attrs.forEach(([name, size], k) => geo.setAttribute(name, new Float32BufferAttribute(arrays[k], size)));
+    const p = new Points(geo, mat);
+    p.frustumCulled = false;
+    disposables.push(geo, mat);
+    return p;
+  };
+
+  // sparkles around the castle (day and night)
   const sparkMat = new ShaderMaterial({
-    uniforms: { uTime: time, uSize: { value: 1 } }, transparent: true, depthWrite: false, blending: AdditiveBlending,
+    uniforms: { uTime: time, uSize: { value: 1 }, uGain: { value: 1 } }, transparent: true, depthWrite: false, blending: AdditiveBlending,
     vertexShader: `attribute float aRnd; uniform float uTime; uniform float uSize; varying float vA;
       void main(){ vA = 0.35 + 0.65 * abs(sin(uTime * (0.6 + aRnd) + aRnd * 40.0));
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = uSize * (5.0 + aRnd * 9.0) * vA; }`,
-    fragmentShader: `varying float vA; void main(){ vec2 p = abs(gl_PointCoord - 0.5) * 2.0;
-        float star = max(0.0, 1.0 - (p.x * p.y * 14.0 + p.x + p.y)); gl_FragColor = vec4(1.0, 0.97, 0.88, star * vA); }`,
+    fragmentShader: `uniform float uGain; varying float vA; void main(){ vec2 p = abs(gl_PointCoord - 0.5) * 2.0;
+        float star = max(0.0, 1.0 - (p.x * p.y * 14.0 + p.x + p.y)); gl_FragColor = vec4(1.0, 0.97, 0.88, star * vA * uGain); }`,
   });
-  ext.add(new Points(sparkGeo, sparkMat));
+  ext.add(points(90, (i, p, r) => {
+    p[i * 3] = (Math.random() - 0.5) * 90; p[i * 3 + 1] = 2 + Math.random() * 34; p[i * 3 + 2] = -14 - Math.random() * 10;
+    r[i] = Math.random();
+  }, [['position', 3], ['aRnd', 1]], sparkMat));
+
+  // night sky: stars over the whole horizon, and now and then a shooting star
+  const starMat = new ShaderMaterial({
+    uniforms: { uTime: time, uSize: { value: 1 }, uNight: { value: 0 } }, transparent: true, depthWrite: false, blending: AdditiveBlending,
+    vertexShader: `attribute vec2 aRnd; uniform float uTime; uniform float uSize; varying float vA; varying float vTint;
+      void main(){ vA = 0.55 + 0.45 * sin(uTime * (0.5 + aRnd.x * 1.6) + aRnd.y * 50.0); vTint = aRnd.y;
+        vA *= smoothstep(0.03, 0.22, normalize(position - cameraPosition).y);                        // none in the haze of the horizon
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = uSize * (1.6 + aRnd.x * aRnd.x * 3.4); }`,
+    fragmentShader: `uniform float uNight; varying float vA; varying float vTint; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0;
+        float a = smoothstep(1.0, 0.15, d) * vA * uNight; if (a < 0.01) discard;
+        gl_FragColor = vec4(mix(vec3(0.82, 0.88, 1.0), vec3(1.0, 0.95, 0.84), vTint), a); }`,
+  });
+  const stars = points(Math.round(620 * preset.particles), (i, p, r) => {
+    p[i * 3] = (Math.random() - 0.5) * 520; p[i * 3 + 1] = 6 + Math.pow(Math.random(), 0.8) * 190; p[i * 3 + 2] = -150 - Math.random() * 110;
+    r[i * 2] = Math.random(); r[i * 2 + 1] = Math.random();
+  }, [['position', 3], ['aRnd', 2]], starMat);
+  ext.add(stars);
+  const meteorMat = new ShaderMaterial({
+    uniforms: { uAlpha: { value: 0 } }, transparent: true, depthWrite: false, blending: AdditiveBlending, side: 2,
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform float uAlpha; varying vec2 vUv; void main(){ float tail = pow(vUv.x, 2.6); float edge = 1.0 - abs(vUv.y - 0.5) * 2.0;
+        float head = smoothstep(0.9, 1.0, vUv.x); gl_FragColor = vec4(mix(vec3(0.8, 0.87, 1.0), vec3(1.0), head), tail * edge * edge * uAlpha); }`,
+  });
+  const meteor = new Mesh(new PlaneGeometry(1, 1), meteorMat);
+  meteor.frustumCulled = false;
+  meteor.visible = false;
+  ext.add(meteor);
+  disposables.push(meteor.geometry, meteorMat);
+  const shot = { t: 0, dur: 1, wait: 3 + Math.random() * 4, from: new Vector3(), dir: new Vector3(), len: 24 };
+
+  // the lanterns' soft halos
+  const lampList = node('W_Lamps')?.userData?.lamps || [];
+  const haloMat = new ShaderMaterial({
+    uniforms: { uTime: time, uSize: { value: 1 }, uNight: { value: 0 } }, transparent: true, depthWrite: false, blending: AdditiveBlending,
+    vertexShader: `attribute float aRnd; uniform float uTime; uniform float uSize; varying float vA;
+      void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;
+        vA = 0.88 + 0.12 * sin(uTime * (2.0 + aRnd * 2.0) + aRnd * 30.0); gl_PointSize = min(uSize * 620.0 / -mv.z, uSize * 260.0); }`,
+    fragmentShader: `uniform float uNight; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0;
+        float a = pow(max(0.0, 1.0 - d), 2.2) * 0.62 * vA * uNight; if (a < 0.004) discard; gl_FragColor = vec4(1.0, 0.8, 0.5, a); }`,
+  });
+  const halos = points(lampList.length / 3, (i, p, r) => {
+    const v = b2t([lampList[i * 3], lampList[i * 3 + 1], lampList[i * 3 + 2]]);
+    p[i * 3] = v.x; p[i * 3 + 1] = v.y; p[i * 3 + 2] = v.z; r[i] = Math.random();
+  }, [['position', 3], ['aRnd', 1]], haloMat);
+  ext.add(halos);
 
   // petals drifting down along the path
-  const PET = mobile ? 130 : 240, pp = new Float32Array(PET * 3), pr = new Float32Array(PET);
-  for (let i = 0; i < PET; i++) {
-    pp[i * 3] = (Math.random() - 0.5) * 30; pp[i * 3 + 1] = Math.random() * 9; pp[i * 3 + 2] = -1 + Math.random() * 64;
-    pr[i] = Math.random();
-  }
-  const petGeo = new BufferGeometry();
-  petGeo.setAttribute('position', new Float32BufferAttribute(pp, 3));
-  petGeo.setAttribute('aRnd', new Float32BufferAttribute(pr, 1));
-  const petMat = new ShaderMaterial({
+  const petalShader = (range, extra) => new ShaderMaterial({
     uniforms: { uTime: time, uSize: { value: 1 } }, transparent: true, depthWrite: false,
-    vertexShader: `attribute float aRnd; uniform float uTime; uniform float uSize; varying float vR;
-      void main(){ vec3 p = position; float t = uTime * (0.35 + aRnd * 0.3);
-        p.y = mod(p.y - t, 9.0) + 0.2; p.x += sin(t * 1.7 + aRnd * 30.0) * 0.7; p.z += cos(t * 1.3 + aRnd * 17.0) * 0.5;
-        vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv; vR = aRnd * 6.2832 + t * 2.0;
-        gl_PointSize = uSize * (60.0 + aRnd * 50.0) / -mv.z; }`,
-    fragmentShader: `varying float vR; void main(){ vec2 q = gl_PointCoord - 0.5; float c = cos(vR), s = sin(vR);
+    vertexShader: `attribute vec3 aRnd; uniform float uTime; uniform float uSize; varying float vR; varying float vA; varying float vTint;
+      void main(){ vec3 p = position; ${extra}
+        vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv; vTint = aRnd.z;
+        gl_PointSize = uSize * (${range}) / -mv.z; }`,
+    fragmentShader: `varying float vR; varying float vA; varying float vTint; void main(){ vec2 q = gl_PointCoord - 0.5; float c = cos(vR), s = sin(vR);
         q = vec2(q.x * c - q.y * s, q.x * s + q.y * c); float d = length(q * vec2(1.0, 1.9));
-        float a = smoothstep(0.5, 0.36, d); if (a < 0.02) discard; gl_FragColor = vec4(0.985, 0.80, 0.85, a * 0.92); }`,
+        float a = smoothstep(0.5, 0.36, d) * vA; if (a < 0.02) discard;
+        gl_FragColor = vec4(mix(vec3(0.985, 0.80, 0.85), vec3(0.99, 0.88, 0.9), vTint), a * 0.92); }`,
   });
-  const petals = new Points(petGeo, petMat);
-  petals.frustumCulled = false;
-  ext.add(petals);
+  const petMat = petalShader('60.0 + aRnd.x * 50.0', `float t = uTime * (0.35 + aRnd.x * 0.3);
+        p.y = mod(p.y - t, 9.0) + 0.2; p.x += sin(t * 1.7 + aRnd.x * 30.0) * 0.7; p.z += cos(t * 1.3 + aRnd.x * 17.0) * 0.5;
+        vR = aRnd.x * 6.2832 + t * 2.0; vA = 1.0;`);
+  const rnd3 = (i, r) => { r[i * 3] = Math.random(); r[i * 3 + 1] = Math.random(); r[i * 3 + 2] = Math.random(); };
+  ext.add(points(Math.round((mobile ? 130 : 240) * preset.particles), (i, p, r) => {
+    p[i * 3] = (Math.random() - 0.5) * 30; p[i * 3 + 1] = Math.random() * 9; p[i * 3 + 2] = -1 + Math.random() * 64;
+    rnd3(i, r);
+  }, [['position', 3], ['aRnd', 3]], petMat));
 
   // moving parts
   const flagGeo = node('W_Flag_0')?.geometry || null;
@@ -185,22 +279,106 @@ export async function createWorld(canvas, onProgress) {
   }
   const clouds = [0, 1, 2, 3].map((i) => node(`W_Cloud_${i}`)).filter(Boolean).map((m, i) => ({ m, base: m.position.clone(), ph: i * 2.3 }));
 
-  // ---------------------------------------------------------------- hall
+  // ---------------------------------------------------------------- hall (light baked into the vertices)
   const hall = new Scene();
+  hall.background = new Color('#F1E0CB');
   hall.add(hallGltf.scene);
-  dress(hallGltf.scene, [[/^W_Balloons/, { mat: balloons }], [/^W_HallFlowers/, { mat: twoSided }]]);
-  hall.add(new HemisphereLight(0xfff3e8, 0xf4dccf, 2.5));
-  const key = new DirectionalLight(0xfff0e0, 1.15);
-  key.position.set(4, 14, 16);
-  hall.add(key);
-  for (const [x, z] of [[-5.5, -3.9], [5.5, -3.9], [0, -4.3]]) {
-    const l = new PointLight(0xffcf8f, 26, 13, 1.7);
-    l.position.set(x, 1.0, z);
-    hall.add(l);
+  const baked = new MeshBasicMaterial({ vertexColors: true });
+  const hallGlow = new MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+  // Balloons: baked colour plus a live glint on every facet, and a slow sway of the whole column.
+  const balloons = new MeshPhongMaterial({ vertexColors: true, color: 0x000000, shininess: 46, specular: 0x6a5a58 });
+  balloons.onBeforeCompile = (s) => {
+    s.uniforms.uTime = time;
+    s.vertexShader = 'uniform float uTime;\n' + s.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      transformed.x += sin(uTime * 0.8 + position.y * 0.32) * 0.035;
+      transformed.z += cos(uTime * 0.62 + position.y * 0.27) * 0.022;`);
+    s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance = vColor.rgb;');
+  };
+  // Floor: baked light, tile joints drawn with exact anti-aliasing, and (medium/high) a soft mirror image.
+  const mirror = preset.reflection > 0 ? new WebGLRenderTarget(4, 4, { depthBuffer: true }) : null;
+  if (mirror) mirror.texture.colorSpace = SRGBColorSpace;
+  const floorMat = new ShaderMaterial({
+    vertexColors: true,
+    defines: mirror ? { MIRROR: 1 } : {},
+    uniforms: { tMirror: { value: mirror ? mirror.texture : null }, uMirror: { value: new Matrix4() }, uEye: { value: new Vector3() }, uTexel: { value: 1 / 512 } },
+    vertexShader: `varying vec3 vCol; varying vec3 vWorld; varying vec4 vMirror; uniform mat4 uMirror;
+      void main(){ vCol = color.rgb; vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz; vMirror = uMirror * w;
+        gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: `varying vec3 vCol; varying vec3 vWorld; varying vec4 vMirror; uniform sampler2D tMirror; uniform vec3 uEye; uniform float uTexel;
+      void main(){
+        vec2 cell = vWorld.xz / 1.6;
+        vec2 g = abs(fract(cell - 0.5) - 0.5) * 1.6;            // distance to the nearest joint, in metres
+        vec2 fw = fwidth(vWorld.xz) * 0.75 + 0.0001;
+        vec2 ln = 1.0 - smoothstep(vec2(0.014) - fw, vec2(0.014) + fw, g);
+        float joint = max(ln.x, ln.y) * clamp(0.02 / max(fw.x, fw.y), 0.0, 1.0);   // fades out before it can shimmer
+        vec3 col = vCol * (1.0 - 0.1 * joint);
+        #ifdef MIRROR
+          vec3 v = normalize(uEye - vWorld);
+          float k = mix(0.16, 0.5, pow(1.0 - clamp(v.y, 0.0, 1.0), 3.0)) * (1.0 - 0.5 * joint);
+          vec2 uv = vMirror.xy / vMirror.w;
+          vec3 r = texture2D(tMirror, uv).rgb * 0.34 + texture2D(tMirror, uv + vec2(0.0, uTexel * 2.2)).rgb * 0.2 + texture2D(tMirror, uv - vec2(0.0, uTexel * 2.2)).rgb * 0.2
+                 + texture2D(tMirror, uv + vec2(uTexel * 1.6, 0.0)).rgb * 0.13 + texture2D(tMirror, uv - vec2(uTexel * 1.6, 0.0)).rgb * 0.13;
+          col = mix(col, r, k);
+        #endif
+        gl_FragColor = vec4(col, 1.0);
+        #include <colorspace_fragment>
+      }`,
+  });
+  disposables.push(baked, hallGlow, balloons, floorMat);
+  let floor = null;
+  hallGltf.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const isGlow = o.material?.name === 'GLOW';
+    if (/^W_Floor/.test(o.name)) { o.material = floorMat; floor = o; }
+    else o.material = isGlow ? hallGlow : /^W_Balloons/.test(o.name) || /^W_Balloons/.test(o.parent?.name || '') ? balloons : baked;
+    disposables.push(o.geometry);
+  });
+  const glint = new DirectionalLight(0xfff2e2, 2.2);      // only the balloons are lit live
+  glint.position.set(-6, 16, 20);
+  hall.add(glint);
+
+  // petals falling through the hall: some drift left, some right, each at its own pace
+  const hallPetMat = petalShader('130.0 + aRnd.x * 110.0', `float fall = 0.42 + aRnd.x * 0.75;
+        float side = (aRnd.y < 0.5 ? -1.0 : 1.0) * (0.22 + aRnd.z * 0.6);
+        float t = uTime;
+        p.y = mod(p.y - t * fall, 12.0) - 0.4;
+        p.x = mod(p.x + t * side + sin(t * (0.5 + aRnd.z * 0.5) + aRnd.x * 40.0) * 0.45 + 22.0, 44.0) - 22.0;
+        p.z += cos(t * (0.4 + aRnd.y * 0.4) + aRnd.z * 25.0) * 0.4;
+        vR = aRnd.y * 6.2832 + t * (0.9 + aRnd.x * 1.3) * (aRnd.y < 0.5 ? -1.0 : 1.0);
+        vA = smoothstep(-0.4, 0.5, p.y) * smoothstep(11.6, 10.2, p.y) * smoothstep(22.0, 19.5, abs(p.x));`);
+  hall.add(points(Math.round(120 * preset.particles), (i, p, r) => {
+    p[i * 3] = (Math.random() - 0.5) * 44; p[i * 3 + 1] = Math.random() * 12; p[i * 3 + 2] = -5.5 + Math.random() * 13;
+    rnd3(i, r);
+  }, [['position', 3], ['aRnd', 3]], hallPetMat));
+
+  // ---------------------------------------------------------------- day and night
+  const cA = new Color(), cB = new Color();
+  const mix = (a, b, t) => cA.set(a).lerp(cB.set(b), t);
+  let nightNow = -1;
+  function setNight(n) {
+    n = Math.min(1, Math.max(0, n));
+    if (Math.abs(n - nightNow) < 0.002) return;
+    nightNow = n;
+    skyMat.uniforms.uTop.value.copy(mix(SKY.day.top, SKY.night.top, n));
+    skyMat.uniforms.uBottom.value.copy(mix(SKY.day.fog, SKY.night.fog, n));
+    ext.fog.color.copy(mix(SKY.day.fog, SKY.night.fog, n));
+    hemi.color.copy(mix(LIGHT.day.hemiSky, LIGHT.night.hemiSky, n));
+    hemi.groundColor.copy(mix(LIGHT.day.hemiGround, LIGHT.night.hemiGround, n));
+    hemi.intensity = lerp(LIGHT.day.hemi, LIGHT.night.hemi, n);
+    sun.color.copy(mix(LIGHT.day.sun, LIGHT.night.sun, n));
+    sun.intensity = lerp(LIGHT.day.sunI, LIGHT.night.sunI, n);
+    lampGain.value.setRGB(1.0, 0.7, 0.4).multiplyScalar(1.1 * n);
+    lampGlass.color.setRGB(lerp(0.9, 1.35, n), lerp(0.88, 1.2, n), lerp(0.82, 0.92, n));
+    starMat.uniforms.uNight.value = n;
+    haloMat.uniforms.uNight.value = n;
+    sparkMat.uniforms.uGain.value = lerp(0.85, 1, n);
+    stars.visible = halos.visible = n > 0.01;
   }
+  setNight(night);
 
   // ---------------------------------------------------------------- camera
   const cam = new PerspectiveCamera(30, 1.5, 0.3, 400);
+  const mirrorCam = new PerspectiveCamera();
   const posCurve = new CatmullRomCurve3(KEYS.map((k) => b2t(k.pos)), false, 'centripetal');
   const tgtCurve = new CatmullRomCurve3(KEYS.map((k) => b2t(k.tgt)), false, 'centripetal');
   // distance walked at each key, and a smooth scroll -> distance curve through them: the camera
@@ -219,22 +397,57 @@ export async function createWorld(canvas, onProgress) {
   const hallFrom = { pos: b2t(HALL.from.pos), tgt: b2t(HALL.from.tgt) }, hallTo = { pos: b2t(HALL.to.pos), tgt: b2t(HALL.to.tgt) };
   const pos = new Vector3(), tgt = new Vector3(), right = new Vector3(), up = new Vector3(), fwd = new Vector3();
   const tilt = { x: 0, y: 0 };
-  let aspect = 1.5, gateOpen = -1, w = 0, h = 0;
+  let aspect = 1.5, gateOpen = -1, w = 0, h = 0, wasHall = null, disposed = false;
   const qTmp = new Quaternion(), qYaw = new Quaternion(), UP = new Vector3(0, 1, 0);
+  const bias = new Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
 
-  function resize() {
+  function resize(force) {
     const cw = canvas.clientWidth || innerWidth, ch = canvas.clientHeight || innerHeight;
-    if (cw === w && ch === h) return;
+    if (!force && cw === w && ch === h) return;
     w = cw; h = ch;
+    renderer.setPixelRatio(pixelRatio());
     renderer.setSize(w, h, false);
     aspect = w / h;
     cam.aspect = aspect;
     const px = renderer.getPixelRatio() * Math.min(1.6, Math.max(0.8, h / 800));
-    sparkMat.uniforms.uSize.value = px;
-    petMat.uniforms.uSize.value = px * (h / 800);
+    sparkMat.uniforms.uSize.value = starMat.uniforms.uSize.value = haloMat.uniforms.uSize.value = px;
+    petMat.uniforms.uSize.value = hallPetMat.uniforms.uSize.value = px * (h / 800);
+    if (mirror) {
+      const mw = Math.max(64, Math.round(w * renderer.getPixelRatio() * preset.reflection)), mh = Math.max(64, Math.round(h * renderer.getPixelRatio() * preset.reflection));
+      mirror.setSize(mw, mh);
+      floorMat.uniforms.uTexel.value = 1 / mh;
+    }
   }
 
-  function frame(p, dt, tiltTarget) {
+  function shootingStar(dt) {
+    if (nightNow < 0.6) { meteor.visible = false; return; }
+    if (!meteor.visible) {
+      shot.wait -= dt;
+      if (shot.wait > 0) return;
+      // starts somewhere in the sky ahead of the camera and falls across it, to the left or to the right
+      const side = Math.random() < 0.5 ? -1 : 1;
+      fwd.subVectors(tgt, pos).normalize();
+      shot.from.copy(pos).addScaledVector(fwd, 210).add(up.set((Math.random() - 0.5) * 150 - side * 30, 55 + Math.random() * 60, 0));
+      shot.from.y = Math.max(shot.from.y, 45);
+      shot.dir.set(side * (0.75 + Math.random() * 0.2), -(0.3 + Math.random() * 0.3), 0).normalize();
+      shot.dur = 0.9 + Math.random() * 0.5;
+      shot.len = 20 + Math.random() * 14;
+      shot.t = 0;
+      meteor.visible = true;
+      meteor.rotation.set(0, 0, Math.atan2(shot.dir.y, shot.dir.x));
+    }
+    shot.t += dt;
+    const f = shot.t / shot.dur;
+    if (f >= 1) { meteor.visible = false; shot.wait = 5 + Math.random() * 9; return; }
+    const grow = Math.min(1, f * 4), lenNow = shot.len * grow;
+    // the plane's +x end is the head; it travels 85 m over its life
+    meteor.position.copy(shot.from).addScaledVector(shot.dir, f * 85 - lenNow / 2);
+    meteor.scale.set(lenNow, 0.55, 1);
+    meteorMat.uniforms.uAlpha.value = Math.sin(Math.PI * Math.min(1, f * 1.15)) * nightNow;
+  }
+
+  function frame(p, dt, tiltTarget, page = 0) {
+    if (disposed) return p >= SWAP;
     resize();
     time.value += dt;
     const t = time.value;
@@ -262,8 +475,16 @@ export async function createWorld(canvas, onProgress) {
       const f = smooth(span(p, [SWAP, 1]));
       pos.lerpVectors(hallFrom.pos, hallTo.pos, f);
       tgt.lerpVectors(hallFrom.tgt, hallTo.tgt, f);
+      // once the letter is open the page scrolls on, and the hall drifts with it: a slow move in and up
+      const g = smooth(Math.min(1, Math.max(0, page)));
+      pos.z -= 2.4 * g; pos.y += 0.9 * g; tgt.y += 2.0 * g;
       tanH = lensTan(HALL.lens);
       k = HALL.k;
+    }
+    if (inHall !== wasHall) {            // each scene has its own depth range (finer depth where it is small)
+      wasHall = inHall;
+      cam.near = inHall ? 2 : 0.3;
+      cam.far = inHall ? 140 : 400;
     }
     cam.fov = fovFor(tanH, k, aspect);
     cam.updateProjectionMatrix();
@@ -286,7 +507,7 @@ export async function createWorld(canvas, onProgress) {
         if (gateL) gateL.rotation.y = g * GATE_ANGLE;
         if (gateR) gateR.rotation.y = -g * GATE_ANGLE;
         gateGlow.intensity = g * 16;
-        renderer.shadowMap.needsUpdate = true;
+        renderer.shadowMap.needsUpdate = shadows;
       }
       for (const b of butterflies) {
         const a = t * b.sp + b.ph;
@@ -304,19 +525,47 @@ export async function createWorld(canvas, onProgress) {
         flagGeo.attributes.position.needsUpdate = true;
         flagGeo.computeVertexNormals();
       }
-      glow.color.setScalar(0.95 + 0.05 * Math.sin(t * 2.3));
+      glow.color.setScalar((0.95 + 0.05 * Math.sin(t * 2.3)) * lerp(1, 1.22, nightNow));
+      shootingStar(dt);
+      skyMat.uniforms.uInvProj.value.copy(cam.projectionMatrixInverse);
+      renderer.render(ext, cam);
     } else {
-      glow.color.setScalar(0.96 + 0.04 * Math.sin(t * 2.3));
+      hallGlow.color.setScalar(0.97 + 0.03 * Math.sin(t * 2.3));
+      if (mirror && floor) {
+        // the hall once more, seen from below the floor, into a small texture the floor then shows
+        mirrorCam.copy(cam, false);
+        mirrorCam.position.set(pos.x, -pos.y, pos.z);
+        mirrorCam.up.set(0, -1, 0);
+        mirrorCam.lookAt(tgt.x, -tgt.y, tgt.z);
+        mirrorCam.updateMatrixWorld();
+        floorMat.uniforms.uMirror.value.copy(bias).multiply(mirrorCam.projectionMatrix).multiply(mirrorCam.matrixWorldInverse);
+        floorMat.uniforms.uEye.value.copy(pos);
+        floor.visible = false;
+        renderer.setRenderTarget(mirror);
+        renderer.render(hall, mirrorCam);
+        renderer.setRenderTarget(null);
+        floor.visible = true;
+      }
+      renderer.render(hall, cam);
     }
-    renderer.render(inHall ? hall : ext, cam);
     return inHall;
   }
 
   // compile shaders and draw the first shadow map before the loader lifts
-  renderer.shadowMap.needsUpdate = true;
-  resize();
+  renderer.shadowMap.needsUpdate = shadows;
+  resize(true);
   frame(0, 0.016, null);
   renderer.compile(hall, cam);
 
-  return { frame, renderer };
+  return {
+    frame, renderer, setNight,
+    setScale(s) { if (s !== scale) { scale = s; resize(true); } },
+    dispose() {
+      disposed = true;
+      for (const d of disposables) d.dispose?.();
+      mirror?.dispose();
+      renderer.dispose();
+      renderer.forceContextLoss();
+    },
+  };
 }

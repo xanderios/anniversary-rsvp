@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="convite">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -23,6 +23,9 @@
     <symbol id="i-clock" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="19.5"/><path d="M24 12v12.5l8 5"/></g></symbol>
     <symbol id="i-pin" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M24 45S10 29.5 10 19.5a14 14 0 0 1 28 0C38 29.5 24 45 24 45Z"/><circle cx="24" cy="19.5" r="4.6"/></g></symbol>
     <symbol id="i-agenda" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5"/></g></symbol>
+    <symbol id="i-bow" viewBox="0 0 64 48"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M32 24c-6-10-18-16-24-10s2 18 24 10zm0 0c6-10 18-16 24-10s-2 18-24 10z"/><path d="M28 27l-6 16M36 27l6 16"/></g><circle cx="32" cy="24" r="4" fill="currentColor"/></symbol>
+    <symbol id="i-wa" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.3-3.9A8 8 0 1 1 8.4 19L4 20z"/><path d="M9 9.5c.3 2.2 2.3 4.2 4.5 4.5l1.3-1.3 2 1-.7 1.8c-4 .6-8.1-3.5-7.5-7.5L10.4 8l1 2L9 9.5z"/></g></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></symbol>
     <symbol id="i-flourish" viewBox="0 0 140 24"><g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M3 13c14-9 24 8 37 2s14-9 19-3c-5 1-7 4-12 3"/><path d="M137 13c-14-9-24 8-37 2s-14-9-19-3c5 1 7 4 12 3"/></g><path fill="currentColor" d="M70 5.5l3.4 6.5-3.4 6.5-3.4-6.5z"/><circle fill="currentColor" cx="70" cy="21.5" r="1.3"/></symbol>
   </svg>
 
@@ -64,7 +67,10 @@
     </div>
   </div>
 
+  <div id="veil" aria-hidden="true"></div>
+  <div id="deco" aria-hidden="true"></div>
   <main id="stage" hidden></main>
+  <div id="confete" class="confete" aria-hidden="true"></div>
 
   <div id="loader" role="status" aria-live="polite">
     <div class="ld-in">

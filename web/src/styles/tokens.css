@@ -19,6 +19,9 @@
   --gold: #A9813A;
   --gold-hi: #CFA858;
   --gold-soft: #E6CD98;
+  --gold-ink: #86631F;   /* gold dark enough for small text on paper (5:1) */
+  --roof-ink: #B33F4D;   /* the roof's rose, dark enough for text on paper */
+  --wax: #BD4050;        /* the seal: the roof's rose taken down to a crimson */
   --line: #EFCDD3;
   --ok-bg: #E4EDD2; --ok: #55692F;
   --no-bg: #F7D9DC; --no: #A8434F;
@@ -27,8 +30,9 @@
   --serif: 'Cormorant Garamond', 'Cormorant', 'EB Garamond', Garamond, 'Times New Roman', serif;
   /* one unit = 1% of the "stage": a phone-shaped column that fits any screen */
   --u: min(1vw, 0.52vh);
+  --dvh: 1vh;            /* 1% of the visible height */
 }
-@supports (height: 1dvh) { :root { --u: min(1vw, 0.52dvh); } }
+@supports (height: 1dvh) { :root { --u: min(1vw, 0.52dvh); --dvh: 1dvh; } }
 
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -42,8 +46,8 @@ button { font: inherit; color: inherit; }
   border: 0; border-radius: 99em; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .15s ease, filter .15s ease; }
 .btn:active { transform: scale(.98); }
 .btn:disabled { opacity: .6; cursor: default; }
-.btn.pri { background: linear-gradient(180deg, #D3AD5F, #B4883A); color: #FFFCF5; box-shadow: inset 0 0 0 .08em rgba(255, 255, 255, .45), 0 .5em 1.2em -.6em rgba(110, 70, 20, .7); }
-.btn.sec { background: rgba(255, 251, 246, .96); color: var(--gold); box-shadow: inset 0 0 0 .08em var(--gold-soft); }
-.btn.ghost { background: none; color: var(--gold); letter-spacing: .12em; }
+.btn.pri { background: linear-gradient(180deg, #F4E0A8, #D8B15E); color: #4A350E; box-shadow: inset 0 0 0 .08em rgba(255, 255, 255, .55), 0 .5em 1.2em -.6em rgba(110, 70, 20, .7); }
+.btn.sec { background: rgba(255, 251, 246, .97); color: var(--gold-ink); box-shadow: inset 0 0 0 .1em var(--gold-hi); }
+.btn.ghost { background: none; color: var(--gold-ink); letter-spacing: .12em; }
 .btn:focus-visible, a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--roof); outline-offset: 3px; }
 @media (hover: hover) { .btn:hover:not(:disabled) { filter: brightness(1.05); } }

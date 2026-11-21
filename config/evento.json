@@ -24,5 +24,15 @@
   "enderecoLinha": "Rua Wilfred Penha Borges, 347 - Recreio dos Bandeirantes, Rio de Janeiro - RJ",
   "avisos": ["Confirme sua presença até 7 de janeiro", "Crianças são muito bem-vindas", "Traje: fique à vontade, tons claros combinam com a festa"],
   "endereco": ["Rua Wilfred Penha Borges, 347", "Recreio dos Bandeirantes", "Rio de Janeiro – RJ", "22790-871"],
-  "despedida": ["Será uma alegria", "ter você conosco!"]
+  "despedida": ["Será uma alegria", "ter você conosco!"],
+  "contato": { "whatsapp": "5521999999999" },
+  "presentes": {
+    "itens": [
+      { "nome": "Lista na loja", "obs": "Link da lista de presentes (substituir)", "url": "https://www.exemplo.com.br/lista-maria-alice" },
+      { "nome": "Roupinhas", "obs": "Tamanho 1 a 2 anos" },
+      { "nome": "Livrinhos de pano ou cartonados", "obs": "Ela adora histórias" },
+      { "nome": "Brinquedos de encaixar e montar", "obs": "A partir de 1 ano" }
+    ],
+    "pix": "chave-pix@exemplo.com"
+  }
 }

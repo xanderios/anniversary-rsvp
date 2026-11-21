@@ -1,0 +1,29 @@
+/* The 3D scene's own page styles: the sky behind it and the quality menu (the cog, top right). */
+
+/* A canvas that is taking over from another (quality change) sits exactly where the first one is. */
+canvas.gl-next { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; touch-action: pan-y; }
+
+#ajustes { position: fixed; z-index: 20; top: max(12px, env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); font-family: var(--serif); color: var(--ink); }
+.aj-cog { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  color: var(--gold); background: rgba(255, 251, 246, .92); box-shadow: inset 0 0 0 1px var(--gold-soft), 0 6px 18px -8px rgba(60, 40, 70, .6); transition: transform .2s ease, filter .15s ease; }
+.aj-cog svg { width: 24px; height: 24px; transition: transform .45s cubic-bezier(.45, 0, .2, 1); }
+.aj-cog[aria-expanded='true'] svg { transform: rotate(60deg); }
+.aj-cog:active { transform: scale(.96); }
+@media (hover: hover) { .aj-cog:hover { filter: brightness(1.04); } }
+#ajustes.busy .aj-cog svg { animation: aj-gira 1.1s linear infinite; }
+@keyframes aj-gira { to { transform: rotate(360deg); } }
+
+.aj-menu { position: absolute; top: 52px; right: 0; width: min(292px, calc(100vw - 24px)); padding: 12px 8px 8px; border-radius: 18px; background: rgba(255, 251, 246, .98);
+  box-shadow: inset 0 0 0 1px var(--gold-soft), 0 18px 40px -18px rgba(60, 30, 50, .7); animation: aj-entra .18s ease both; transform-origin: 100% 0; }
+@keyframes aj-entra { from { opacity: 0; transform: translateY(-6px) scale(.97); } }
+.aj-title { margin: 0 10px 8px; font-size: 13px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--gold); }
+.aj-op { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 7px 10px; border: 0; border-radius: 12px; background: none; text-align: left; cursor: pointer; color: inherit; font: inherit; -webkit-tap-highlight-color: transparent; }
+.aj-op i { flex: none; width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--gold-hi); transition: box-shadow .15s ease, background-color .15s ease; }
+.aj-op[aria-checked='true'] i { background: var(--gold); box-shadow: inset 0 0 0 2px var(--gold), inset 0 0 0 5px var(--paper); }
+.aj-op b { display: block; font-size: 18px; font-weight: 700; line-height: 1.15; }
+.aj-op small { display: block; font-size: 15px; font-style: italic; line-height: 1.2; color: var(--ink-soft); }
+.aj-op[aria-checked='true'] { background: rgba(230, 205, 152, .22); }
+.aj-op:disabled { cursor: progress; opacity: .7; }
+@media (hover: hover) { .aj-op:hover:not(:disabled) { background: rgba(230, 205, 152, .32); } }
+.aj-cog:focus-visible, .aj-op:focus-visible { outline: 2px solid var(--roof); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .aj-menu { animation: none; } .aj-cog svg { transition: none; } }

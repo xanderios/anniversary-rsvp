@@ -3,6 +3,9 @@
 import bpy, bmesh, math, random
 from mathutils import Vector, Matrix, Euler
 
+# Level of detail of the web export: low | medium | high (the runner injects LOD before this file).
+LOD = globals().get("LOD", "medium")
+
 # ---------------------------------------------------------------- palette
 # Sampled from the reference illustration (Image 1) – sRGB hex.
 PAL = {
@@ -11,6 +14,7 @@ PAL = {
     "roof": "#EE9197", "roof_dark": "#DC747C", "flag": "#F29AA4",
     "gold": "#E2AA43", "glow": "#FFD47E", "glow_soft": "#FFE6B8",
     "wood": "#DDA468", "wood_dark": "#C88E55",
+    "post": "#B98450", "post_dark": "#93643A", "lamp": "#FFE9AE",
     # ground
     "grass": "#C9D390", "grass2": "#C1CD88", "grass_side": "#A9B973",
     "path": "#F1D2C7", "tile1": "#F9E4DA", "tile2": "#F6DCD1", "tile3": "#FBEAE2",
@@ -69,7 +73,7 @@ def get_mat(key, emit=0.0):
     return m
 
 
-EMIT = {"glow": 1.25, "glow_soft": 1.9, "spark": 1.6}
+EMIT = {"glow": 1.25, "glow_soft": 1.9, "spark": 1.6, "lamp": 1.6}
 
 
 def M_(key):

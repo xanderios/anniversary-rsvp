@@ -76,6 +76,25 @@ function convitePara(c) {
   return r;
 }
 
+// Optional extras from config/evento.json, cut down to what the page shows (anything missing
+// or malformed is simply left out, and the page hides that part).
+const texto = (v, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+const linkOk = (v) => { try { return ['http:', 'https:'].includes(new URL(v).protocol) ? String(v) : ''; } catch { return ''; } };
+function extras() {
+  const zap = String(evento.contato?.whatsapp ?? '').replace(/\D/g, '');
+  const itens = (Array.isArray(evento.presentes?.itens) ? evento.presentes.itens : [])
+    .map((i) => ({ nome: texto(i?.nome), obs: texto(i?.obs), url: linkOk(i?.url) }))
+    .filter((i) => i.nome)
+    .slice(0, 30)
+    .map((i) => ({ nome: i.nome, ...(i.obs && { obs: i.obs }), ...(i.url && { url: i.url }) }));
+  const pix = texto(evento.presentes?.pix);
+  return {
+    ...(zap && { contato: { whatsapp: zap } }),
+    ...((itens.length || pix) && { presentes: { itens, ...(pix && { pix }) } }),
+  };
+}
+const extrasConvite = extras();
+
 function dadosConvite(r) {
   return {
     convidado: r.nome,
@@ -91,6 +110,7 @@ function dadosConvite(r) {
       inicio: evento.inicio, diaSemana: textos.diaSemana, dataLonga: evento.dataLonga, horaLonga: evento.horaLonga, horaNota: evento.horaNota,
       local: evento.local, bairro: evento.bairro, enderecoLinha: evento.enderecoLinha,
       boasVindas: evento.boasVindas, subtitulo: evento.subtitulo, contagemNota: evento.contagemNota, avisos: evento.avisos,
+      ...extrasConvite,
     },
   };
 }

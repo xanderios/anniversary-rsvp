@@ -230,7 +230,8 @@ def build_path():
 FLAG_POS = []
 
 
-def tower(mb, x, y, r, h, roof_h, wins=(), seg=16, top_wins=(-1, 0, 1), flag=True):
+def tower(mb, x, y, r, h, roof_h, wins=(), seg=16, top_wins=(-1, 0, 1), flag=True, trim=None):
+    trim = trim or mb                      # windows live in their own mesh (see build_castle)
     ph = -math.pi / 2 - math.pi / seg
     T = tr(x, y, 0)
     mb.lathe([(0, r * 1.07), (0.3, r * 1.07), (0.38, r), (h - 0.32, r), (h - 0.05, r * 1.2), (h + 0.3, r * 1.2)],
@@ -257,11 +258,11 @@ def tower(mb, x, y, r, h, roof_h, wins=(), seg=16, top_wins=(-1, 0, 1), flag=Tru
     r_in = r * math.cos(math.pi / seg)
     for zf, k, w_, hr_ in wins:
         ang = -math.pi / 2 + 2 * math.pi * k / seg
-        window(mb, T @ rot_z(ang + math.pi / 2) @ tr(0, -r_in, zf), w_, hr_)
+        window(trim, T @ rot_z(ang + math.pi / 2) @ tr(0, -r_in, zf), w_, hr_)
     r2_in = r2 * math.cos(math.pi / seg)
     for k in top_wins:
         ang = -math.pi / 2 + 2 * math.pi * k / seg
-        window(mb, T @ rot_z(ang + math.pi / 2) @ tr(0, -r2_in, h + 0.3 + dh * 0.28), 0.085 * r + 0.03, dh * 0.22, frame=False)
+        window(trim, T @ rot_z(ang + math.pi / 2) @ tr(0, -r2_in + 0.035, h + 0.3 + dh * 0.28), 0.085 * r + 0.03, dh * 0.22, frame=False)
     # stone accents
     for _ in range(int(3 + h * 1.3)):
         k = random.randint(-3, 3)
@@ -288,6 +289,9 @@ def merlons_x(mb, x0, x1, y, z, skip=None):
 
 def build_castle():
     cas = MB("Castle")
+    # Windows (glowing panes and their frames) are a mesh of their own: thin trim must not darken
+    # the wall under it when occlusion is baked, nor throw a smeared shadow down the wall.
+    trim = MB("CastleTrim")
     W, D, GH = 2.5, 3.0, 3.4
     a, hr = 1.05, 1.45
     # --- gatehouse: front wall with arched opening
@@ -315,7 +319,7 @@ def build_castle():
             cas.box((0.34, 0.36, 0.34), (sx * (W - 0.19), yy, GH + 0.17), "wall")
     wall_bricks(cas, -W + 0.3, -a - 0.55, 0.4, GH - 0.4, 0, 5)
     wall_bricks(cas, a + 0.55, W - 0.3, 0.4, GH - 0.4, 0, 5)
-    window(cas, tr(0, 0, 2.78), 0.17, 0.2)
+    window(trim, tr(0, 0, 2.78), 0.17, 0.2)
     # --- gable above the gate
     gw, gh1, gh2, gd = 1.3, 1.05, 2.4, 1.6
     cas.prism([(-gw, 0), (gw, 0), (gw, gh1), (0, gh2), (-gw, gh1)], gd, "wall", M=tr(0, 0.0, GH))
@@ -326,7 +330,7 @@ def build_castle():
         nrm = Vector((sx * math.sin(beta), 0, math.cos(beta)))
         c = Vector((sx * gw / 2, gd / 2 - 0.08, GH + (gh1 + gh2) / 2)) + nrm * 0.085 + along * 0.14
         cas.box((L + 0.5, gd + 0.3, 0.17), c, "roof", rot=Euler((0, sx * beta, 0)))
-    window(cas, tr(0, 0, GH + 0.5), 0.3, 0.5)
+    window(trim, tr(0, 0, GH + 0.5), 0.3, 0.5)
     cas.ico(0.11, (0, 0.5, GH + gh2 + 0.22), "gold")
     cas.lathe([(GH + gh2 + 0.2, 0.026), (GH + gh2 + 1.0, 0.026)], 4, "gold", M=tr(0, 0.5, 0))
     FLAG_POS.append((0, 0.5, GH + gh2 + 0.92))
@@ -334,29 +338,39 @@ def build_castle():
     cas.box((4.3, 1.9, 5.2), (0.1, 3.95, 2.6), "wall")
     merlons_x(cas, -1.85, 2.05, 3.17, 5.2)
     # --- towers
-    tower(cas, 0.9, 3.1, 1.1, 8.3, 3.7, wins=[(6.6, 0, 0.17, 0.3), (7.4, 1, 0.13, 0.22), (5.6, -1, 0.13, 0.22)])
-    tower(cas, -1.95, 2.9, 1.0, 7.0, 3.0, wins=[(5.9, 0, 0.16, 0.28), (4.6, -1, 0.13, 0.22)])
-    tower(cas, 3.15, 2.5, 0.95, 6.4, 3.1, wins=[(5.3, 0, 0.15, 0.26), (4.3, 1, 0.12, 0.2)])
-    tower(cas, -5.9, 0.7, 1.25, 4.3, 2.8, wins=[(3.1, 0, 0.19, 0.3), (2.0, 1, 0.14, 0.24), (2.6, -1, 0.14, 0.24)])
-    tower(cas, 3.45, 0.15, 0.9, 4.1, 2.6, wins=[(3.0, 0, 0.15, 0.26), (1.7, 0, 0.13, 0.22)])
-    tower(cas, 6.15, 0.6, 0.95, 3.0, 2.4, wins=[(1.9, 0, 0.15, 0.26), (2.2, -1, 0.12, 0.2)])
+    tower(cas, 0.9, 3.1, 1.1, 8.3, 3.7, wins=[(6.6, 0, 0.17, 0.3), (7.4, 1, 0.13, 0.22), (5.6, -1, 0.13, 0.22)], trim=trim)
+    tower(cas, -1.95, 2.9, 1.0, 7.0, 3.0, wins=[(5.9, 0, 0.16, 0.28), (4.6, -1, 0.13, 0.22)], trim=trim)
+    tower(cas, 3.15, 2.5, 0.95, 6.4, 3.1, wins=[(5.3, 0, 0.15, 0.26), (4.3, 1, 0.12, 0.2)], trim=trim)
+    tower(cas, -5.9, 0.7, 1.25, 4.3, 2.8, wins=[(3.1, 0, 0.19, 0.3), (2.0, 1, 0.14, 0.24), (2.6, -1, 0.14, 0.24)], trim=trim)
+    tower(cas, 3.45, 0.15, 0.9, 4.1, 2.6, wins=[(3.0, 0, 0.15, 0.26), (1.7, 0, 0.13, 0.22)], trim=trim)
+    tower(cas, 6.15, 0.6, 0.95, 3.0, 2.4, wins=[(1.9, 0, 0.15, 0.26), (2.2, -1, 0.12, 0.2)], trim=trim)
     # --- wing walls
     cas.box((3.2, 0.9, 2.7), (-4.1, 0.95, 1.35), "wall")
     merlons_x(cas, -5.4, -2.8, 0.67, 2.7)
-    window(cas, tr(-3.75, 0.5, 1.35), 0.17, 0.28)
+    window(trim, tr(-3.75, 0.5, 1.35), 0.17, 0.28)
     wall_bricks(cas, -5.0, -2.8, 0.3, 2.3, 0.5, 5)
     cas.box((3.4, 0.9, 2.3), (4.4, 1.05, 1.15), "wall")
     merlons_x(cas, 4.5, 5.2, 0.77, 2.3)
-    window(cas, tr(4.85, 0.6, 1.2), 0.15, 0.24)
+    window(trim, tr(4.85, 0.6, 1.2), 0.15, 0.24)
     wall_bricks(cas, 4.4, 5.2, 0.3, 1.9, 0.6, 3)
+    # door frame: a wooden lining just in front of the leaves, so no light leaks around them
+    fw_ = 0.07
+    ai = a - fw_
+    lining = ([(ai, 0), (a, 0), (a, hr)]
+              + [(a * math.cos(math.pi * i / 10), hr + a * math.sin(math.pi * i / 10)) for i in range(1, 10)]
+              + [(-a, hr), (-a, 0), (-ai, 0), (-ai, hr)]
+              + [(ai * math.cos(math.pi * (1 - i / 10)), hr + ai * math.sin(math.pi * (1 - i / 10))) for i in range(1, 10)]
+              + [(ai, hr)])
+    cas.prism(lining, 0.07, "wood_dark", M=tr(0, 0.12, 0))
     castle = cas.build(loc=(CX, 0, 0), coll=C_CAS)
+    trim.build(loc=(CX, 0, 0), coll=C_CAS)
 
     # --- gates (two leaves hinged on the outer edges, opening inwards)
     def leaf(side):
         d = MB("Gate_L" if side < 0 else "Gate_R")
         pts = [(-a, 0), (0, 0), (0, hr)] + [(a * math.cos(t) - a, hr + a * math.sin(t))
                                              for t in [math.pi / 2 * i / 6 for i in range(1, 7)]]
-        pts = [(x * 0.985, z * 0.99) for x, z in pts]
+        pts = [(x, z * 0.99) for x, z in pts]       # the two leaves meet exactly: no slit between them
         if side < 0:
             pts = [(-x, z) for x, z in reversed(pts)]
         d.prism(pts, 0.12, "wood")
@@ -367,6 +381,8 @@ def build_castle():
         for zb_ in (0.45, 1.55):
             d.box((a * 0.97, 0.03, 0.07), (side * -a * 0.5, -0.008, zb_), "wood_dark")
         d.ico(0.075, (side * -(a - 0.17), -0.06, 1.15), "gold")
+        if side > 0:                             # a cover strip on one leaf laps over the meeting edges
+            d.box((0.06, 0.025, 2.4), (-a, -0.0125, 1.2), "wood_dark")
         return d.build(loc=(side * a, 0.2, 0.07), parent=castle, coll=C_CAS)
     leaf(-1); leaf(1)
 
@@ -871,6 +887,74 @@ def build_countryside():
             n += 1
 
 
+# ================================================================ lamp posts
+LAMPS = []          # lantern centres (x, y, z): the web export bakes their night light and adds a glow
+
+
+def lantern(mb, M):
+    """A four-sided lantern hanging from (or standing under) its top point at the origin of M."""
+    q = math.pi / 4
+    mb.lathe([(-0.2, 0.235), (-0.05, 0.06), (0.03, 0.0)], 4, "post_dark", M=M, phase=q)
+    mb.lathe([(-0.235, 0.2), (-0.2, 0.2)], 4, "post_dark", M=M, phase=q)
+    mb.lathe([(-0.62, 0.115), (-0.235, 0.18)], 4, "lamp", M=M, phase=q)
+    mb.lathe([(-0.7, 0.05), (-0.66, 0.135), (-0.62, 0.135)], 4, "post_dark", M=M, phase=q)
+    for k in range(4):                           # the four corner bars of the cage
+        a0 = q + k * math.pi / 2
+        lo_, hi_ = Vector((0.118 * math.cos(a0), 0.118 * math.sin(a0), -0.62)), Vector((0.183 * math.cos(a0), 0.183 * math.sin(a0), -0.235))
+        d = hi_ - lo_
+        Mq = Matrix.Translation((lo_ + hi_) / 2) @ d.to_track_quat("Z", "Y").to_matrix().to_4x4()
+        mb.box((0.03, 0.03, d.length), (0, 0, 0), "post_dark", M=M @ Mq)
+    return M @ Vector((0, 0, -0.43))
+
+
+def lamp_post(mb, x, y, face, kind, s=1.15):
+    """A wooden post with a lantern. kind 0: the lantern hangs from an arm that points along `face`;
+    kind 1: the lantern stands on top of the post."""
+    T = tr(x, y, H(x, y) - 0.06) @ rot_z(face) @ Matrix.Scale(s, 4)
+    q = math.pi / 4
+    top = 3.05 if kind == 0 else 2.55
+    mb.lathe([(0, 0.25), (0.36, 0.25), (0.5, 0.15), (0.62, 0.125)], 4, "post_dark", M=T, phase=q)
+    mb.lathe([(0.62, 0.105), (top, 0.08)], 4, "post", M=T, phase=q)
+    mb.lathe([(1.3, 0.118), (1.4, 0.118)], 4, "post_dark", M=T, phase=q)
+    if kind == 0:
+        mb.lathe([(top, 0.1), (top + 0.05, 0.1), (top + 0.2, 0.0)], 4, "post_dark", M=T, phase=q)
+        mb.box((1.0, 0.09, 0.09), (0.36, 0, top - 0.2), "post", M=T)
+        mb.box((0.62, 0.07, 0.07), (0.3, 0, top - 0.47), "post_dark", rot=Euler((0, -math.pi / 4, 0)), M=T)
+        mb.box((0.03, 0.03, 0.16), (0.7, 0, top - 0.325), "post_dark", M=T)
+        head = lantern(mb, T @ tr(0.7, 0, top - 0.4))
+    else:
+        mb.lathe([(top, 0.16), (top + 0.06, 0.16)], 4, "post_dark", M=T, phase=q)
+        head = lantern(mb, T @ tr(0, 0, top + 0.76))
+    LAMPS.append(tuple(round(v, 3) for v in head))
+
+
+def build_lamps():
+    """Lamp posts here and there along the walk, a pair where the garden begins and a pair at the gates.
+    Each one stands just off the paving, clear of bushes and trees; flowers make room for it."""
+    lm = MB("Lamps")
+    solid = [(o.location.x, o.location.y, (0.95 if o.name.startswith(("GBush_", "Bush_")) else 0.55) * o.scale.x)
+             for o in C_TREE.objects if o.location.z > -40 and o.name.startswith(("GBush_", "Bush_", "BlossomTree_", "Cypress_"))]
+    #        (y, side, kind)
+    spots = [(-62.0, -1, 0), (-54.5, 1, 1), (-47.0, -1, 0), (-39.0, 1, 0), (-31.5, -1, 1), (-24.0, 1, 0),
+             (-16.5, -1, 0), (-9.0, 1, 1), (-9.0, -1, 0)]
+    for y0, side, kind in spots:
+        for dy in (0.0, 0.7, -0.7, 1.4, -1.4, 2.1, -2.1, 2.8, -2.8, 3.5, -3.5):
+            y = y0 + dy
+            x = pc(y) + side * (hw(y) + 0.62)
+            if all((x - ox) ** 2 + (y - oy) ** 2 >= (0.6 + orr) ** 2 for ox, oy, orr in solid):
+                break
+        lamp_post(lm, x, y, math.pi if side > 0 else 0.0, kind)
+    for side in (-1, 1):                         # flanking the gates
+        lamp_post(lm, CX + side * 2.12, -0.62, -math.pi / 2, 1, s=1.0)
+    for o in list(C_FLO.objects):                # no flower grows through a post
+        if o.location.z > -40 and any((o.location.x - lx) ** 2 + (o.location.y - ly) ** 2 < 0.55 ** 2 for lx, ly, _z in LAMPS):
+            bpy.data.objects.remove(o, do_unlink=True)
+    for o in list(C_TREE.objects):               # ... and no bush stands where the gate lamps do
+        if o.name.startswith(("GBush_", "Bush_")) and any(abs(lx - CX) < 3 and ly > -2 and (o.location.x - lx) ** 2 + (o.location.y - ly) ** 2 < (0.5 + 0.95 * o.scale.x) ** 2 for lx, ly, _z in LAMPS):
+            bpy.data.objects.remove(o, do_unlink=True)
+    return lm.build(coll=C_CAS)
+
+
 # ================================================================ build all
 build_terrain()
 build_path()
@@ -896,6 +980,7 @@ OCC += [(-10.3, -4.2, 0.9), (11.3, -4.0, 0.9), (-5.6, -1.9, 0.5), (8.3, -0.4, 0.
 build_flowers()
 build_sky()
 separate_random(build_countryside, 2029)
+separate_random(build_lamps, 2031)
 separate_random(build_butterflies, 2030)
 
 # ---------------------------------------------------------------- light + camera
