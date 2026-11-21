@@ -8,7 +8,7 @@ const OPCOES = [
 ];
 const NOMES = { low: 'baixa', medium: 'média', high: 'alta' };
 const SOL = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.4" fill="currentColor"/><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 2.6v2.6M12 18.8v2.6M2.6 12h2.6M18.8 12h2.6M5.4 5.4l1.8 1.8M16.8 16.8l1.8 1.8M5.4 18.6l1.8-1.8M16.8 7.2l1.8-1.8"/></g></svg>';
-const LUA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.2 14.6A8.6 8.6 0 0 1 9.4 3.8a.6.6 0 0 0-.8-.7 9.6 9.6 0 1 0 12.3 12.3.6.6 0 0 0-.7-.8Z"/></svg>';
+const LUA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" transform="matrix(-1 0 0 1 24 0)" d="M20.2 14.6A8.6 8.6 0 0 1 9.4 3.8a.6.6 0 0 0-.8-.7 9.6 9.6 0 1 0 12.3 12.3.6.6 0 0 0-.7-.8Z"/></svg>';
 const RELOGIO = '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.2V12l3.2 2"/></g></svg>';
 const CEUS = [['auto', 'Relógio', RELOGIO], ['dia', 'Dia', SOL], ['noite', 'Noite', LUA]];
 const NOTAS = { auto: 'Acompanha a hora do seu aparelho', dia: 'Sol sobre o castelo', noite: 'Lua, estrelas e postes acesos' };

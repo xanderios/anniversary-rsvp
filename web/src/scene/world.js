@@ -50,8 +50,8 @@ const BODY = 0.099;                       // the sun's radius, as a share of hal
 const MOON = 1.12;                        // the moon's radius, in suns (a crescent is slighter than a disc)
 const HALO = 3.4;                         // the reach of their glow, in radii
 // The crescent is a disc with a second disc cut out of it: SHADE is how far the cut is pushed (towards
-// the upper right, so the lit edge is the lower left one) and how large it is. Flip x to mirror the moon.
-const SHADE = { x: 0.46, y: 0.24, r: 0.93 };
+// the upper left, so the lit edge is the lower right one) and how large it is. Flip x to mirror the moon.
+const SHADE = { x: -0.46, y: 0.24, r: 0.93 };
 const TURN = { time: 0.6, speed: 0.17 };  // the wheel: seconds to pick up speed, and turns per second at most
 
 // `sky` is the phase the scene opens at (see sky.js): 0 = day, 0.5 = night.
