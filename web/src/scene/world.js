@@ -39,14 +39,14 @@ const LIGHT = {
   night: { hemiSky: 0xb4c0f2, hemiGround: 0x7377ac, hemi: 1.5, sun: 0xc6d3ff, sunI: 0.8 },
 };
 
-// Where the sun (by day) and the moon (by night) rest. They are so far away that walking does not
-// move them: they keep one place in the picture from the first frame to the gates, and only the
-// garden moves. That place is found on the first frame: just above the crown of the cloud on the
-// right, behind it (dx, dy: metres from the cloud's middle). `up` keeps it inside the picture on
-// any screen, as a share of the way from the middle to the top.
+// Where the sun (by day) and the moon (by night) rest: with the cloud up on the right of the castle,
+// just behind it, and they stay with that cloud all along the walk. `sun` and `moon` are how far from
+// the cloud's middle each one sits (metres to the right, metres up): the sun peeks over its crown, the
+// moon stands a little further up and to the right so the cloud does not cover it. `spare` is where
+// the cloud would be, should a model have none.
 // Both are flat pictures: the sun a plain disc, the moon a waning crescent.
-const REST = { cloud: 'W_Cloud_1', dx: 0.7, dy: 2.5, up: [0.74, 0.86], side: 0.8 };
-const BODY = 0.099;                       // the sun's radius, as a share of half the picture's height (of its width, on a narrow screen)
+const REST = { cloud: 'W_Cloud_1', sun: [0.7, 2.5], moon: [2.2, 3.3], behind: 3, spare: [10.5, 9, -15] };
+const BODY = 1.4;                         // the sun's radius, in metres at the cloud
 const MOON = 1.12;                        // the moon's radius, in suns (a crescent is slighter than a disc)
 const HALO = 3.4;                         // the reach of their glow, in radii
 // The crescent is a disc with a second disc cut out of it: SHADE is how far the cut is pushed (towards
@@ -164,17 +164,7 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
   // clouds pass in front of them, and far land that has already melted into the sky stays behind.
   const bodyGeo = new PlaneGeometry(2, 2);
   disposables.push(bodyGeo);
-  // the resting place on the first frame, as tangents off the camera's line of sight (null: no such cloud)
-  const restAt = (() => {
-    const cloud = node(REST.cloud);
-    if (!cloud) return null;
-    garden.scene.updateMatrixWorld(true);
-    const eye = b2t(KEYS[0].pos), f = b2t(KEYS[0].tgt).sub(eye).normalize();
-    const r = new Vector3().crossVectors(f, new Vector3(0, 1, 0)).normalize(), u = new Vector3().crossVectors(r, f);
-    const v = cloud.getWorldPosition(new Vector3());
-    v.x += REST.dx; v.y += REST.dy; v.sub(eye);
-    return { x: v.dot(r) / v.dot(f), y: v.dot(u) / v.dot(f) };
-  })();
+  const restCloud = node(REST.cloud);
   const body = (isSun) => {
     const uniforms = { uAlpha: { value: 1 }, uLow: { value: 0 } };   // uLow: 0 high in the sky, 1 down at the horizon
     const mat = new ShaderMaterial({
@@ -212,10 +202,9 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
     root.renderOrder = -50;                           // after the stars, before everything else that glows
     root.frustumCulled = false;
     ext.add(root);
-    return { root, uniforms, size: isSun ? 1 : MOON, dir: new Vector3(), x: 0, y: 0, lag: isSun ? 0 : 0.5 };
+    return { root, uniforms, size: isSun ? 1 : MOON, off: isSun ? REST.sun : REST.moon, dir: new Vector3(), x: 0, y: 0, dist: 100, lag: isSun ? 0 : 0.5 };
   };
   const bodies = [body(true), body(false)];
-  let bodyFar = 100;
 
   const hemi = new HemisphereLight(0xffffff, 0xffffff, 1);
   ext.add(hemi);
@@ -562,33 +551,43 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
   }
 
   // Where the sun and the moon stand in the picture: positions are tangents off the camera's line
-  // of sight. The one in the sky rests at the same place whatever the scroll (see REST). Their wheel
-  // is an ellipse behind the land, centred under the castle: a turn carries the one in the sky over
-  // the towers and down on the left while the other one comes up on the right.
+  // of sight. The one in the sky rests by its cloud (see REST), just behind it. Their wheel is an
+  // ellipse behind the land, centred under the castle: a turn carries the one in the sky over the
+  // towers and down on the left while the other one comes up on the right; away from the cloud they
+  // sink back to where the haze closes, so the garden passes in front of them.
+  const restPoint = new Vector3(), qInv = new Quaternion();
   function aimBodies() {
-    const tv = Math.tan((cam.fov * Math.PI) / 360), th = tv * aspect, r = BODY * Math.min(tv, th / 1.2);
-    const tv0 = Math.tan((fovFor(lensTan(KEYS[0].lens), KEYS[0].k, aspect) * Math.PI) / 360);   // the first frame's own picture
-    const ax = th * (restAt ? clamp(restAt.x / (tv0 * aspect), -REST.side, REST.side) : 0.42);
-    const ay = tv * (restAt ? clamp(restAt.y / tv0, REST.up[0], REST.up[1]) : 0.8);
-    bodyFar = lerp(ext.fog.near, ext.fog.far, 0.65);   // behind all that is still solid, in front of what is mostly haze
+    const tv = Math.tan((cam.fov * Math.PI) / 360);
+    const haze = lerp(ext.fog.near, ext.fog.far, 0.65);   // behind all that is still solid, in front of what is mostly haze
     const pitch = Math.asin((tgt.y - cam.position.y) / cam.position.distanceTo(tgt));
-    const ground = Math.tan(-Math.asin(Math.min(0.9, cam.position.y / bodyFar)) - pitch);   // where the land ends, at that distance
-    const cy = ground + 0.3 * (ay - ground), dy = ay - cy, top = Math.max(0.9 * tv - 1.3 * r, cy + dy / 0.8);
-    // a circle where it fits under the top of the picture, flatter where it does not (the resting place
-    // is near the top: the turn may graze the picture's edge, but always goes up and over)
-    const flat = clamp(Math.sqrt(Math.max(0, (top - cy) ** 2 - dy * dy)) / Math.max(1e-3, Math.abs(ax)), 0.12, 1);
-    const A = Math.hypot(ax, dy / flat), B = flat * A, rest = Math.atan2(ax / A, dy / B), high = Math.cos(rest);
-    // Half a turn of the wheel for half a turn of the sky, but not evenly: at twilight (a quarter turn)
-    // one is setting on the left just as the other rises on the right, wherever the resting place is.
+    const ground = Math.tan(-Math.asin(Math.min(0.9, cam.position.y / haze)) - pitch);   // where the land ends, at that distance
     const half = phase * 2, u = half - Math.floor(half);
-    const turned = (Math.floor(half) + u) * Math.PI + clamp(rest, 0, 0.9) * Math.sin(Math.PI * u) ** 2;
+    qInv.copy(cam.quaternion).invert();
     for (const b of bodies) {
-      const a = rest - turned - b.lag * 2 * Math.PI, c = Math.cos(a);
+      // the resting place, seen from here
+      if (restCloud) restCloud.parent.localToWorld(restPoint.copy(restCloud.position));
+      else restPoint.fromArray(REST.spare);
+      restPoint.x += b.off[0]; restPoint.y += b.off[1];
+      restPoint.sub(cam.position);
+      const near = restPoint.length() + REST.behind, r = (BODY * b.size) / restPoint.length();
+      restPoint.applyQuaternion(qInv);
+      b.root.visible = restPoint.z < -1;
+      if (!b.root.visible) continue;
+      const ax = restPoint.x / -restPoint.z, ay = restPoint.y / -restPoint.z;
+      const cy = ground + 0.3 * (ay - ground), dy = Math.max(0.02, ay - cy), top = Math.max(0.9 * tv - 1.3 * r, cy + dy / 0.8);
+      // a circle where it fits under the top of the picture, flatter where it does not
+      const flat = clamp(Math.sqrt(Math.max(0, (top - cy) ** 2 - dy * dy)) / Math.max(1e-3, Math.abs(ax)), 0.12, 1);
+      const A = Math.hypot(ax, dy / flat), B = flat * A, rest = Math.atan2(ax / A, dy / B), high = Math.cos(rest);
+      // Half a turn of the wheel for half a turn of the sky, but not evenly: at twilight (a quarter turn)
+      // one is setting on the left just as the other rises on the right, wherever the resting place is.
+      const turned = (Math.floor(half) + u) * Math.PI + clamp(rest, 0, 0.9) * Math.sin(Math.PI * u) ** 2 + b.lag * 2 * Math.PI;
+      const a = rest - turned, c = Math.cos(a), gone = turned % (2 * Math.PI);
       const show = smooth(span(c, [-0.32, Math.min(0.06, 0.5 * high)]));   // fades into the haze below the wheel's own horizon
       b.root.visible = show > 0.004;
       if (!b.root.visible) continue;
       b.x = A * Math.sin(a); b.y = cy + B * c;
-      b.root.scale.setScalar(bodyFar * r * b.size * HALO);
+      b.dist = lerp(near, Math.max(near, haze), smooth(span(Math.min(gone, 2 * Math.PI - gone), [0.08, 0.7])));
+      b.root.scale.setScalar(b.dist * r * HALO);
       b.uniforms.uAlpha.value = show;
       b.uniforms.uLow.value = 1 - smooth(span(c, [0.05, 0.9 * high]));
     }
@@ -680,11 +679,11 @@ export async function createWorld(canvas, onProgress, { preset, sky: skyAtStart 
       aimBodies();
       for (const b of bodies) {
         if (!b.root.visible) continue;
-        b.dir.set(b.x, b.y, -1).normalize().applyQuaternion(cam.quaternion);   // the same place in the picture, wherever the camera looks
-        b.root.position.copy(cam.position).addScaledVector(b.dir, bodyFar);
+        b.dir.set(b.x, b.y, -1).normalize().applyQuaternion(cam.quaternion);
+        b.root.position.copy(cam.position).addScaledVector(b.dir, b.dist);
         b.root.quaternion.copy(cam.quaternion);
       }
-      const moon = bodies[1], disc = moon.root.scale.x / HALO / bodyFar;   // the moon's radius, as a tangent
+      const moon = bodies[1], disc = moon.root.scale.x / HALO / moon.dist;   // the moon's radius, as a tangent
       if (moon.root.visible) starMat.uniforms.uMoon.value.set(moon.dir.x, moon.dir.y, moon.dir.z, 1 / Math.sqrt(1 + disc * disc));
       else starMat.uniforms.uMoon.value.w = 2;
       skyMat.uniforms.uInvProj.value.copy(cam.projectionMatrixInverse);

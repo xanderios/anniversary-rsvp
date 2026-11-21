@@ -49,13 +49,13 @@ npm start                 # http://localhost:3000 (ou a PORT do .env)
 
 ## Dia e noite
 
-O céu segue o relógio de quem abre o convite: azul de dia, com o sol no alto à direita, saindo de trás da nuvem na
-primeira cena; à noite, a lua minguante no mesmo lugar, estrelas, estrelas cadentes e os postes acesos (amanhecer das 5h30 às 6h30, anoitecer das 17h30 às 18h30).
+O céu segue o relógio de quem abre o convite: azul de dia, com o sol saindo de trás da nuvem à direita do castelo; à
+noite, a lua minguante ao lado da mesma nuvem, estrelas, estrelas cadentes e os postes acesos (amanhecer das 5h30 às 6h30, anoitecer das 17h30 às 18h30).
 Para testar: `?ceu=noite`, `?ceu=dia` ou `?hora=18`.
 
 - A engrenagem também deixa escolher o céu: **Relógio** (o padrão), **Dia** ou **Noite**. A escolha vale só para aquela
   visita; ao abrir de novo, o convite volta a seguir o relógio.
-- O sol e a lua ficam parados na tela durante todo o passeio (estão longe demais para se mexer): só o jardim passa.
+- O sol e a lua acompanham essa nuvem durante todo o passeio; a lua fica um pouco acima e à direita dela (`REST`).
 - Ao trocar, o sol e a lua giram na mesma roda, sempre para a esquerda: um se põe à esquerda enquanto o outro nasce à
   direita, e a luz passa por um crepúsculo rosado no meio do caminho. Cores do céu em `web/src/scene/sky.js` (`SKY`),
   luz em `LIGHT` e posição, tamanho, desenho da lua e velocidade em `REST`, `BODY`, `MOON`, `SHADE` e `TURN`, no começo
