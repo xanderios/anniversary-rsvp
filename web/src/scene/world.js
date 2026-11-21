@@ -284,6 +284,7 @@ export async function createWorld(canvas, onProgress, { preset, night = 0 } = {}
   hall.background = new Color('#F1E0CB');
   hall.add(hallGltf.scene);
   const baked = new MeshBasicMaterial({ vertexColors: true });
+  const bakedLeaves = new MeshBasicMaterial({ vertexColors: true, side: 2 });       // bouquets: leaves show from both sides
   const hallGlow = new MeshBasicMaterial({ vertexColors: true, toneMapped: false });
   // Balloons: baked colour plus a live glint on every facet, and a slow sway of the whole column.
   const balloons = new MeshPhongMaterial({ vertexColors: true, color: 0x000000, shininess: 46, specular: 0x6a5a58 });
@@ -324,13 +325,16 @@ export async function createWorld(canvas, onProgress, { preset, night = 0 } = {}
         #include <colorspace_fragment>
       }`,
   });
-  disposables.push(baked, hallGlow, balloons, floorMat);
+  disposables.push(baked, bakedLeaves, hallGlow, balloons, floorMat);
   let floor = null;
   hallGltf.scene.traverse((o) => {
     if (!o.isMesh) return;
     const isGlow = o.material?.name === 'GLOW';
     if (/^W_Floor/.test(o.name)) { o.material = floorMat; floor = o; }
-    else o.material = isGlow ? hallGlow : /^W_Balloons/.test(o.name) || /^W_Balloons/.test(o.parent?.name || '') ? balloons : baked;
+    else {
+      const nome = `${o.name} ${o.parent?.name || ''}`;
+      o.material = isGlow ? hallGlow : /W_Balloons/.test(nome) ? balloons : /W_HallFlowers/.test(nome) ? bakedLeaves : baked;
+    }
     disposables.push(o.geometry);
   });
   const glint = new DirectionalLight(0xfff2e2, 2.2);      // only the balloons are lit live

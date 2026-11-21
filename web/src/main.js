@@ -271,6 +271,7 @@ async function start() {
     const page = letter.tick(dt); // 0 until the letter is open, then the open page's scroll progress, 0 (top) to 1 (bottom)
     const noSalao = world.frame(p, dt, tilt.state, page);
     pagina = page;
+    settings?.tuck(page > 0.04);
     if (noSalao !== salao) { salao = noSalao; document.body.classList.toggle('in-hall', salao); }
     fade.style.opacity = fadeAt(p).toFixed(3);
 

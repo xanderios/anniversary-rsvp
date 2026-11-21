@@ -4,7 +4,7 @@
 @import '@fontsource/cormorant-garamond/700.css';
 @import '@fontsource/cormorant-garamond/500-italic.css';
 @import '@fontsource/cormorant-garamond/600-italic.css';
-@import '@fontsource/great-vibes/400.css';
+@import '@fontsource/montecarlo/400.css';
 
 /* Palette sampled from the garden scene and the invitation card. */
 :root {
@@ -26,7 +26,7 @@
   --ok-bg: #E4EDD2; --ok: #55692F;
   --no-bg: #F7D9DC; --no: #A8434F;
   --wait-bg: #F6E9CC; --wait: #8A6A1F;
-  --script: 'Great Vibes', 'Snell Roundhand', 'Apple Chancery', cursive;
+  --script: 'MonteCarlo', 'Snell Roundhand', 'Apple Chancery', cursive;
   --serif: 'Cormorant Garamond', 'Cormorant', 'EB Garamond', Garamond, 'Times New Roman', serif;
   /* one unit = 1% of the "stage": a phone-shaped column that fits any screen */
   --u: min(1vw, 0.52vh);

@@ -119,9 +119,7 @@ def mini_tower(mb, x, y, r, h, roof_h, wins=()):
     top = zr + roof_h
     mb.ico(0.08, (x, y, top + 0.04), "h_gold")
     mb.lathe([(top, 0.02), (top + 0.62, 0.02)], 4, "h_gold", M=T)
-    for flip in (False, True):                     # a little golden pennant, seen from both sides
-        tri = [(x, y, top + 0.62), (x + 0.5, y, top + 0.5), (x, y, top + 0.38)]
-        mb.poly(list(reversed(tri)) if flip else tri, "h_gold")
+    mb.poly([(x, y, top + 0.38), (x + 0.5, y, top + 0.5), (x, y, top + 0.62)], "h_gold")       # a little golden pennant, facing the room
     r_in = r * math.cos(math.pi / seg)
     for zf, w_, hr_ in wins:
         window(mb, T @ tr(0, -r_in, zf), w_, hr_, key="h_glow")
@@ -190,9 +188,9 @@ def bouquet(mb, cx, cy, cz, R, n, leaves=7):
         d = Vector((random.uniform(-1, 1), random.uniform(-1, 0.2), random.uniform(-0.2, 0.9))).normalized()
         Mq = Matrix.Translation(Vector((cx, cy, cz)) + d * R * 0.8) @ d.to_track_quat("Y", "Z").to_matrix().to_4x4()
         l, w = R * 0.5, R * 0.17
-        for flip in (False, True):                 # leaves are seen from both sides
-            for tri, key in (([(0, 0, 0), (w, 0.45 * l, 0.04), (0, l, 0)], "green_in"), ([(0, 0, 0), (0, l, 0), (-w, 0.45 * l, 0.04)], "leaf2")):
-                mb.poly(list(reversed(tri)) if flip else tri, key, M=Mq)
+        # one sheet per leaf half (the site draws the flowers two-sided; twin faces would bake black)
+        mb.poly([(0, 0, 0), (w, 0.45 * l, 0.04), (0, l, 0)], "green_in", M=Mq)
+        mb.poly([(0, 0, 0), (0, l, 0), (-w, 0.45 * l, 0.04)], "leaf2", M=Mq)
 
 
 def stand(mb, x, y, z, s=1.0):

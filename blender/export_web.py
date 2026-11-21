@@ -522,6 +522,32 @@ def hall_colors(name):
         if d.any() and not d.all():
             c[[li for li, k in zip(lis, d) if k]] = c[[li for li, k in zip(lis, d) if not k]].mean(axis=0)
     dark = c.max(axis=1) < 0.05
+    # A facet with every corner buried may still poke out (flowers packed into a bouquet): it takes the
+    # light of the facets it touches, or failing that the average of its own material.
+    if dark.any():
+        at_vertex = {}
+        for li, loop in enumerate(me.loops):
+            if not dark[li]:
+                at_vertex.setdefault(loop.vertex_index, []).append(li)
+        by_mat = {}
+        for p in me.polygons:
+            lit_ = [li for li in p.loop_indices if not dark[li]]
+            if lit_:
+                by_mat.setdefault(p.material_index, []).extend(lit_)
+        mat_mean = {k: c[v].mean(axis=0) for k, v in by_mat.items()}
+        fixed = []
+        for p in me.polygons:
+            lis = list(p.loop_indices)
+            if not dark[lis].all():
+                continue
+            near = [li for l in lis for li in at_vertex.get(me.loops[l].vertex_index, ())]
+            if near:
+                fixed.append((lis, c[near].mean(axis=0)))
+            elif p.material_index in mat_mean:
+                fixed.append((lis, mat_mean[p.material_index] * 0.8))
+        for lis, v in fixed:
+            c[lis] = v
+        dark = c.max(axis=1) < 0.05
     # corners that share a vertex and a facing share one value: smoother, and far fewer vertices to send
     cn = me.corner_normals
     groups = {}
@@ -563,7 +589,10 @@ for out_name, srcs in (("Room", ("Shell", "Alcove", "Rug")), ("Floor", ("Floor",
                        ("Table", ("PartyTable",)), ("HallFlowers", ("Flowers",)), ("Balloons_L", ("Balloons_L",)), ("Balloons_R", ("Balloons_R",))):
     g = Group(out_name)
     for s in srcs:
-        add_visible(g, HS[s], hall_colors(s))
+        if s == "Flowers":                     # leaves are drawn two-sided: keep them all
+            g.add(HS[s], hall_colors(s))
+        else:
+            add_visible(g, HS[s], hall_colors(s))
     g.build(Hc)
 if bpy.context.window is not None:
     bpy.context.window.scene = ext           # the export collections hang under the exterior scene

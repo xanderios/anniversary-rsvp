@@ -45,6 +45,8 @@ export function createSettings({ onChoose }) {
 
   return {
     show() { raiz.hidden = false; },
+    // steps aside while the open page is scrolled away from its top (it would sit on the cards)
+    tuck(sim) { const fora = sim && !aberto; if (fora !== raiz.inert) { raiz.inert = fora; raiz.classList.toggle('fora', fora); } },
     // choice: what the guest picked (auto / low / medium / high); level: what is being drawn; busy: a change is loading
     update({ choice, level, busy }) {
       ops.forEach((o) => { o.setAttribute('aria-checked', String(o.dataset.v === choice)); o.disabled = !!busy; });

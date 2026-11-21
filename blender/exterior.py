@@ -940,7 +940,7 @@ def build_lamps():
     for y0, side, kind in spots:
         for dy in (0.0, 0.7, -0.7, 1.4, -1.4, 2.1, -2.1, 2.8, -2.8, 3.5, -3.5):
             y = y0 + dy
-            x = pc(y) + side * (hw(y) + 0.62)
+            x = pc(y) + side * (hw(y) + 1.3)      # well off the paving: the camera never brushes past a lantern
             if all((x - ox) ** 2 + (y - oy) ** 2 >= (0.6 + orr) ** 2 for ox, oy, orr in solid):
                 break
         lamp_post(lm, x, y, math.pi if side > 0 else 0.0, kind)
