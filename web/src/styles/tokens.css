@@ -1,0 +1,49 @@
+@import '@fontsource/cormorant-garamond/400.css';
+@import '@fontsource/cormorant-garamond/500.css';
+@import '@fontsource/cormorant-garamond/600.css';
+@import '@fontsource/cormorant-garamond/700.css';
+@import '@fontsource/cormorant-garamond/500-italic.css';
+@import '@fontsource/cormorant-garamond/600-italic.css';
+@import '@fontsource/great-vibes/400.css';
+
+/* Palette sampled from the garden scene and the invitation card. */
+:root {
+  --sky-top: #F9D1DA;
+  --sky-bottom: #FCE2E6;
+  --hall: #FCEDE3;
+  --paper: #FFFBF6;
+  --ink: #5B3A3F;
+  --ink-soft: #84646A;
+  --roof: #D9636E;
+  --roof-soft: #F4B9C0;
+  --gold: #A9813A;
+  --gold-hi: #CFA858;
+  --gold-soft: #E6CD98;
+  --line: #EFCDD3;
+  --ok-bg: #E4EDD2; --ok: #55692F;
+  --no-bg: #F7D9DC; --no: #A8434F;
+  --wait-bg: #F6E9CC; --wait: #8A6A1F;
+  --script: 'Great Vibes', 'Snell Roundhand', 'Apple Chancery', cursive;
+  --serif: 'Cormorant Garamond', 'Cormorant', 'EB Garamond', Garamond, 'Times New Roman', serif;
+  /* one unit = 1% of the "stage": a phone-shaped column that fits any screen */
+  --u: min(1vw, 0.52vh);
+}
+@supports (height: 1dvh) { :root { --u: min(1vw, 0.52dvh); } }
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; font-family: var(--serif); font-weight: 500; font-variant-numeric: lining-nums; color: var(--ink); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Buttons share the invitation's lettering: spaced Garamond capitals, gold on cream. */
+.btn { display: block; width: 100%; text-align: center; text-decoration: none; font-family: var(--serif); font-weight: 700; text-transform: uppercase; letter-spacing: .17em; line-height: 1;
+  border: 0; border-radius: 99em; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .15s ease, filter .15s ease; }
+.btn:active { transform: scale(.98); }
+.btn:disabled { opacity: .6; cursor: default; }
+.btn.pri { background: linear-gradient(180deg, #D3AD5F, #B4883A); color: #FFFCF5; box-shadow: inset 0 0 0 .08em rgba(255, 255, 255, .45), 0 .5em 1.2em -.6em rgba(110, 70, 20, .7); }
+.btn.sec { background: rgba(255, 251, 246, .96); color: var(--gold); box-shadow: inset 0 0 0 .08em var(--gold-soft); }
+.btn.ghost { background: none; color: var(--gold); letter-spacing: .12em; }
+.btn:focus-visible, a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--roof); outline-offset: 3px; }
+@media (hover: hover) { .btn:hover:not(:disabled) { filter: brightness(1.05); } }

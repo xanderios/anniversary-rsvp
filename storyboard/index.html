@@ -1,0 +1,710 @@
+<meta charset="utf-8">
+<title>Maria Alice Storyboard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,500;1,600&family=Great+Vibes&display=swap">
+<style>
+/* Layout: a storybook contact sheet. Each scene is a film frame (real Blender render + UI mock) beside its shooting notes.
+   Type follows the invitation card: a flowing script for names, a Garamond for everything else, gold on cream. */
+:root {
+  --sky: #FCE6EA;        /* page ground, the scene's sky */
+  --paper: #FFFBF6;      /* invitation paper */
+  --ink: #5B3A3F;        /* rosewood text */
+  --ink-soft: #84646A;
+  --roof: #D9636E;       /* coral roof */
+  --roof-soft: #F4B9C0;
+  --gold: #A9813A;       /* lettering gold */
+  --gold-hi: #CFA858;
+  --gold-soft: #E6CD98;
+  --sage: #6F8749;
+  --line: #EFCDD3;
+  --script: "Great Vibes", "Snell Roundhand", "Apple Chancery", cursive;
+  --serif: "Cormorant Garamond", "Cormorant", "EB Garamond", Garamond, "Times New Roman", serif;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--sky); color: var(--ink);
+  font-family: var(--serif); font-weight: 500; font-size: 1.16rem; line-height: 1.45; font-variant-numeric: lining-nums;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 72px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; text-wrap: balance; margin: 0; color: var(--ink); }
+h1 { font-size: clamp(2.1rem, 5vw, 3.2rem); line-height: 1.05; }
+h1 em { font-family: var(--script); font-style: normal; font-weight: 400; color: var(--gold); font-size: 1.35em; padding-left: .08em; }
+h2 { font-size: clamp(1.6rem, 3vw, 2.1rem); font-style: italic; }
+h3 { font-size: 1.45rem; line-height: 1.2; }
+p { margin: 0; }
+code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .8em; background: var(--paper); padding: .1em .4em; border-radius: 4px; word-break: break-all; }
+.eyebrow { font-size: 0.82rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); }
+.lede { max-width: 62ch; color: var(--ink-soft); font-size: 1.22rem; }
+.sym { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+header.top { display: flex; flex-direction: column; gap: 14px; }
+.changes { background: var(--paper); border: 1px solid var(--gold-soft); border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; }
+.changes ul { margin: 0; padding-left: 1.1em; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 6px 32px; }
+.changes li::marker { color: var(--gold); }
+
+.act { display: flex; flex-direction: column; gap: 30px; }
+.act-head { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 22px; }
+.act-head p { color: var(--ink-soft); max-width: 66ch; }
+
+.scene { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.scene > * { min-width: 0; }
+.stage { display: flex; gap: 14px; align-items: flex-end; }
+.stage > * { min-width: 0; }
+.screen { position: relative; flex: 1 1 auto; aspect-ratio: 3 / 2; max-width: 100%; border-radius: 10px; overflow: hidden; font-size: 6px;
+  background: var(--roof-soft); box-shadow: 0 1px 0 #fff inset, 0 10px 28px -14px rgba(120, 60, 70, .45); }
+.screen > img, .phone > img.bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.phone { position: relative; flex: 0 0 auto; width: 30%; max-width: 100%; aspect-ratio: 9 / 18.5; border-radius: 22px; overflow: hidden; font-size: 2.3px;
+  border: 5px solid var(--paper); background: var(--roof-soft); box-shadow: 0 10px 28px -14px rgba(120, 60, 70, .55); }
+.phones { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.cap { font-size: 0.86rem; color: var(--ink-soft); text-align: center; margin-top: 6px; font-style: italic; }
+.col { display: flex; flex-direction: column; flex: 0 0 auto; }
+.col.grow { flex: 1 1 auto; min-width: 0; }
+.w-phone { width: min(46%, 250px); }
+.w-phone .phone, .w-big .phone { width: 100%; }
+.w-big { width: min(100%, 330px); }
+.three .w-phone { width: min(31%, 220px); }
+
+.notes { display: flex; flex-direction: column; gap: 12px; }
+.num { font-style: italic; font-weight: 600; color: var(--roof); font-size: 1.1rem; }
+.notes dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; font-size: 1.08rem; }
+.notes dt { font-weight: 700; font-size: 0.74rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); padding-top: 6px; }
+.notes dd { margin: 0; color: var(--ink); }
+.notes ol { margin: 0; padding-left: 1.2em; font-size: 1.08rem; display: flex; flex-direction: column; gap: 4px; }
+.notes ol li::marker { color: var(--gold); font-weight: 700; }
+.track { position: relative; height: 5px; border-radius: 3px; background: var(--line); }
+.track i { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--gold-hi); }
+.track-l { display: flex; justify-content: space-between; font-size: 0.86rem; color: var(--ink-soft); font-variant-numeric: lining-nums tabular-nums; }
+
+/* ---------- site UI kit (em = 1% of the mock's width, set by script) ---------- */
+.ui-btn { display: block; text-align: center; font-family: var(--serif); font-weight: 700; text-transform: uppercase; letter-spacing: .17em;
+  font-size: 3.5em; padding: .95em .6em .9em; border-radius: 99em; border: 0; cursor: default; line-height: 1; }
+.ui-btn.pri { background: linear-gradient(180deg, #D3AD5F, #B4883A); color: #FFFCF5; box-shadow: inset 0 0 0 .08em rgba(255, 255, 255, .45), 0 .5em 1.2em -.6em rgba(110, 70, 20, .7); }
+.ui-btn.sec { background: rgba(255, 251, 246, .95); color: var(--gold); box-shadow: inset 0 0 0 .08em var(--gold-soft); }
+.ui-btn.ghost { background: none; color: var(--gold); letter-spacing: .12em; padding-block: .5em; }
+button.ui-btn { cursor: pointer; width: 100%; }
+button.ui-btn:focus-visible, .replay:focus-visible { outline: 2px solid var(--roof); outline-offset: 3px; }
+.hint { position: absolute; left: 50%; bottom: 7%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: .6em; color: var(--ink); white-space: nowrap; }
+.hint span { font-style: italic; font-weight: 600; font-size: 2.5em; background: rgba(255, 251, 246, .9); padding: .5em 1.3em .55em; border-radius: 99em; box-shadow: inset 0 0 0 .06em var(--gold-soft), 0 .3em 1em -.4em rgba(120, 60, 70, .6); }
+.hint svg { width: 2.6em; height: 2.6em; color: var(--gold); animation: nudge 1.6s ease-in-out infinite; }
+.phone .hint { white-space: normal; width: 80%; text-align: center; bottom: 8%; }
+.phone .hint span { font-size: 5em; border-radius: 1.4em; line-height: 1.15; }
+.phone .hint svg { width: 6em; height: 6em; }
+@keyframes nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(18%); } }
+.rail { position: absolute; right: 2.4%; top: 12%; bottom: 12%; width: 2px; background: rgba(255, 251, 246, .75); border-radius: 2px; }
+.rail i { position: absolute; left: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--paper); border: 2px solid var(--gold-hi); transform: translateY(-50%); }
+.skip { position: absolute; right: 5%; top: 5%; font-style: italic; font-weight: 600; font-size: 2.1em; color: var(--ink);
+  background: rgba(255, 251, 246, .85); padding: .35em 1em .4em; border-radius: 99em; box-shadow: inset 0 0 0 .06em var(--gold-soft); }
+.tilt { position: absolute; left: 4%; top: 5%; font-size: 1.9em; font-style: italic; color: var(--ink); background: rgba(255, 251, 246, .8); padding: .3em .9em; border-radius: 99em; }
+.bloom { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 62%, rgba(255, 252, 244, .98) 0%, rgba(255, 250, 240, .86) 38%, rgba(255, 246, 236, .5) 100%); }
+.dim { position: absolute; inset: 0; background: rgba(120, 70, 78, .3); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.phone > img.hall { transform: scale(1.5); transform-origin: 50% 64%; }
+.msg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 66%; background: var(--paper); border-radius: 2em; padding: 4.5em 5em; text-align: center;
+  display: flex; flex-direction: column; gap: 1.2em; box-shadow: inset 0 0 0 .1em var(--gold-soft), 0 2em 4em -2em rgba(90, 40, 50, .6); }
+.msg b { font-family: var(--script); font-weight: 400; font-size: 6em; line-height: 1; color: var(--gold); }
+.msg p { font-size: 2.5em; color: var(--ink-soft); line-height: 1.3; }
+
+/* loading screen */
+.ld { position: absolute; inset: 0; background: #FEFCF7 url(img/convite_arte.jpg) center / cover; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.6em; color: var(--gold); padding: 0 9em; text-align: center; }
+.ld svg { width: 15em; height: 11em; }
+.ld-name { font-family: var(--script); font-size: 17em; line-height: .9; background: linear-gradient(180deg, #D3AD5F, #AC8236); -webkit-background-clip: text; background-clip: text; color: transparent; padding: .1em .1em 0; }
+.ld-sub { font-size: 4.2em; letter-spacing: .3em; font-weight: 600; }
+.ld-bar { width: 52em; height: .7em; border-radius: 1em; background: var(--gold-soft); overflow: hidden; margin-top: 3em; }
+.ld-bar i { display: block; height: 100%; width: 64%; background: linear-gradient(90deg, #D3AD5F, #B4883A); }
+.ld-txt { font-size: 3.6em; font-style: italic; color: var(--ink-soft); }
+.ld-card { position: absolute; left: 6%; right: 6%; bottom: 4%; background: rgba(255, 251, 246, .97); border-radius: 4em; padding: 5em 5em 3.5em; display: flex; flex-direction: column; gap: 1.6em;
+  box-shadow: inset 0 0 0 .2em var(--gold-soft), 0 3em 6em -3em rgba(90, 40, 50, .7); }
+.ld-card p { font-size: 4.3em; line-height: 1.2; color: var(--ink); }
+
+/* ---------- the invitation, in HTML (em = 1% of the card's width) ---------- */
+.inv-box { position: relative; aspect-ratio: 853 / 1280; font-size: 3px; border-radius: 4px; overflow: hidden; box-shadow: 0 14px 30px -16px rgba(90, 40, 50, .6); }
+.inv { position: absolute; inset: 0; background: #FEFCF7 url(img/convite_arte.jpg) center / 100% 100% no-repeat; color: var(--gold); font-family: var(--serif); font-weight: 500; overflow: hidden; }
+.inv > * { position: absolute; margin: 0; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; }
+.inv svg { display: block; }
+.inv-poem { left: 49.35%; top: 24.15%; font-size: 3.82em; font-style: italic; font-weight: 500; line-height: 1.225; color: #B08A42; }
+.inv-rule { display: flex; align-items: center; gap: 1.9em; }
+.inv-rule i { display: block; width: 12.2em; height: .13em; background: #CDAE6B; }
+.inv-rule svg { width: 2.2em; height: 2em; }
+.inv-r1 { left: 48.8%; top: 32.7%; }
+.inv-caps { text-transform: uppercase; font-weight: 500; letter-spacing: .15em; line-height: 1.32; }
+.inv-lead { left: 48.25%; top: 37.45%; font-size: 2.72em; color: #B08A42; }
+.inv-crown { left: 48.3%; top: 43.3%; width: 9.2em; height: 6.9em; }
+.inv-name { left: 48.4%; top: 51.2%; font-family: var(--script); font-weight: 400; font-size: 15.9em; line-height: 1; padding: .12em .12em .2em;
+  background: linear-gradient(175deg, #D8B466 10%, #B88C3C 55%, #C9A352 90%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.inv-age { left: 49.75%; top: 58.55%; display: flex; align-items: center; gap: 1.5em; color: #B08A42; }
+.inv-age i { display: block; width: 9.6em; height: .13em; background: #CDAE6B; }
+.inv-age svg { width: 1.7em; height: 1.55em; }
+.inv-age span { font-size: 3.55em; letter-spacing: .13em; font-weight: 500; text-transform: uppercase; padding: 0 .15em 0 .28em; line-height: 1; }
+.inv-ic { width: 6.2em; height: 6.2em; color: #C19A4C; }
+.inv-ic1 { left: 21.45%; top: 65.4%; } .inv-ic2 { left: 44.7%; top: 65.45%; } .inv-ic3 { left: 71.2%; top: 65.6%; }
+.inv-col { font-size: 2.62em; color: #B08A42; letter-spacing: .13em; }
+.inv-c1 { left: 21.95%; top: 70.7%; } .inv-c2 { left: 44.85%; top: 69.5%; } .inv-c3 { left: 71.9%; top: 69.5%; letter-spacing: .2em; }
+.inv-addr { left: 72.3%; top: 74.85%; font-size: 2.45em; letter-spacing: .02em; line-height: 1.22; color: #A8833F; font-weight: 500; font-variant-numeric: lining-nums; }
+.inv-vr { width: .13em; height: 12.5%; background: #CDAE6B; top: 69.9%; }
+.inv-v1 { left: 35.17%; } .inv-v2 { left: 54.16%; }
+.inv-h2 { left: 49.6%; top: 81.4%; width: 2.2em; height: 2em; }
+.inv-bye { left: 50.2%; top: 85.5%; font-size: 2.72em; color: #B08A42; letter-spacing: .16em; }
+.inv-fl { left: 50.05%; top: 89.55%; width: 16.4em; height: 2.8em; color: #C19A4C; }
+.compare { display: flex; gap: 16px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+.compare .col { width: min(47%, 330px); }
+.compare img { width: 100%; display: block; border-radius: 4px; box-shadow: 0 14px 30px -16px rgba(90, 40, 50, .6); }
+
+/* ---------- envelope + letter prototype (em = 1% of the phone's width) ---------- */
+.lt-envb, .lt-envf { position: absolute; left: 11%; width: 78%; bottom: 17%; height: 53.8em; }
+.lt-envb { z-index: 1; } .lt-envf { z-index: 3; }
+.lt-inside { position: absolute; inset: 0; border-radius: 1.4em; background: linear-gradient(180deg, #EBC9C4, #F6DDD6 60%); box-shadow: 0 3em 5em -2.5em rgba(80, 35, 45, .75); }
+.lt-flap { position: absolute; left: 0; top: 0; width: 100%; height: 58%; transform-origin: 50% 0; transform-style: preserve-3d; }
+.lt-flap-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.lt-flap-out .lt-flap-face { clip-path: polygon(0 0, 100% 0, 50% 100%); background: linear-gradient(180deg, #FFF7F1 0%, #F9E6DE 62%, #ECCFC6 100%); }
+.lt-flap-in .lt-flap-face { clip-path: polygon(0 100%, 100% 100%, 50% 0); transform: rotateX(180deg);
+  background: radial-gradient(circle at 50% 100%, #FADCDD, #F4C5CB 70%), #F6CDD1; }
+.lt-pocket { position: absolute; inset: 0; border-radius: 1.4em; overflow: hidden; }
+.lt-pocket i { position: absolute; inset: 0; }
+.lt-pocket i:nth-child(1) { clip-path: polygon(0 0, 52% 54%, 0 100%); background: linear-gradient(90deg, #FBEFE8, #F1DAD0); }
+.lt-pocket i:nth-child(2) { clip-path: polygon(100% 0, 48% 54%, 100% 100%); background: linear-gradient(270deg, #FBEFE8, #F0D8CE); }
+.lt-pocket i:nth-child(3) { clip-path: polygon(0 100%, 50% 47%, 100% 100%); background: linear-gradient(0deg, #FFFBF7, #FBEEE6); }
+.lt-to { position: absolute; left: 0; right: 0; bottom: 7%; text-align: center; line-height: 1.05; }
+.lt-to small { display: block; font-size: 2.5em; letter-spacing: .26em; text-transform: uppercase; color: var(--gold); font-weight: 700; }
+.lt-to b { font-family: var(--script); font-weight: 400; font-size: 7.2em; color: var(--ink); }
+.lt-seal { position: absolute; left: 50%; top: 54%; width: 13.6em; height: 13.6em; transform: translate(-50%, -50%); border-radius: 47% 53% 50% 50% / 52% 48% 52% 48%;
+  background: radial-gradient(circle at 34% 28%, #EFD08A 0%, #CFA552 42%, #A97C2E 100%); box-shadow: inset 0 0 0 .9em rgba(255, 240, 200, .16), inset 0 -.6em 1.2em rgba(90, 55, 10, .35), 0 .8em 1.4em -.5em rgba(80, 45, 15, .7);
+  display: grid; place-items: center; }
+.lt-seal b { font-family: var(--script); font-weight: 400; font-size: 7.4em; color: #FFF6DF; text-shadow: 0 .06em .08em rgba(100, 60, 10, .5); line-height: 1; padding-top: .12em; }
+.lt-sheet { position: absolute; left: 6%; width: 88%; top: 4.2%; aspect-ratio: 853 / 1280; font-size: .88em; z-index: 2; transform-origin: 50% 50%; }
+.lt-panel { position: absolute; left: 0; width: 100%; height: 33.4%; transform-style: preserve-3d; }
+.lt-mid { top: 33.333%; z-index: 1; }
+.lt-bot { top: 66.666%; transform-origin: 50% 0; z-index: 2; transform: perspective(160em) rotateX(180deg); }
+.lt-top { top: 0; transform-origin: 50% 100%; z-index: 3; transform: perspective(160em) rotateX(-180deg); }
+.lt-face { position: absolute; inset: 0; overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; box-shadow: 0 0 0 .05em rgba(190, 160, 120, .25); }
+.lt-face.back { transform: rotateX(180deg); background: linear-gradient(180deg, #FDF8F1, #F7EEE3); }
+.lt-face .inv { inset: auto; left: 0; width: 100%; height: 300%; top: calc(-100% * var(--i)); }
+.lt-crease { position: absolute; left: 0; right: 0; height: 1.2em; pointer-events: none; z-index: 4; opacity: 0;
+  background: linear-gradient(180deg, rgba(120, 80, 60, 0), rgba(120, 80, 60, .09) 48%, rgba(255, 255, 255, .5) 52%, rgba(255, 255, 255, 0)); }
+.lt-cta { position: absolute; left: 9%; right: 9%; bottom: 4.5%; z-index: 5; display: flex; flex-direction: column; gap: 1.6em; }
+.lt-cta.rsvp { opacity: 0; pointer-events: none; }
+.replay { align-self: center; margin-top: 10px; font-family: var(--serif); font-style: italic; font-weight: 600; font-size: 1.05rem; color: var(--gold); background: var(--paper); border: 1px solid var(--gold-soft); border-radius: 99px; padding: .3em 1.1em .35em; cursor: pointer; }
+
+/* answer sheets */
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--paper); border-radius: 5em 5em 0 0; padding: 7em 8em 6em; display: flex; flex-direction: column; gap: 2em; text-align: center;
+  box-shadow: inset 0 .2em 0 var(--gold-soft); }
+.sheet h4 { margin: 0; font-family: var(--script); font-weight: 400; font-size: 10.5em; line-height: 1; color: var(--gold); }
+.sheet p { font-size: 4.5em; line-height: 1.22; color: var(--ink); }
+.sheet small { font-size: 3.7em; font-style: italic; color: var(--ink-soft); line-height: 1.2; }
+.mini-inv { position: absolute; left: 22%; width: 56%; top: 5%; }
+
+/* ---------- admin mocks ---------- */
+.admin { background: var(--paper); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 10px 28px -14px rgba(120, 60, 70, .45); font-size: 1.02rem; font-variant-numeric: lining-nums; }
+.admin-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.admin-top strong { font-family: var(--script); font-weight: 400; font-size: 1.9rem; color: var(--gold); line-height: 1; }
+.pill-btn { background: linear-gradient(180deg, #D3AD5F, #B4883A); color: #FFFCF5; font-weight: 700; padding: .5em 1.1em; border-radius: 99px; font-size: .78rem; letter-spacing: .14em; text-transform: uppercase; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+.stat { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+.stat b { display: block; font-size: 1.9rem; line-height: 1.1; font-weight: 600; font-variant-numeric: lining-nums tabular-nums; }
+.stat span { font-size: .9rem; color: var(--ink-soft); font-style: italic; }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 470px; font-variant-numeric: lining-nums tabular-nums; }
+th { text-align: left; font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+td { padding: 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.st { font-size: .74rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: .25em .8em; border-radius: 99px; }
+.st.ok { background: #E4EDD2; color: #55692F; } .st.no { background: #F7D9DC; color: #A8434F; } .st.wait { background: #F6E9CC; color: #8A6A1F; }
+.link { color: var(--gold); font-weight: 700; }
+.example { font-size: .92rem; color: var(--ink-soft); font-style: italic; }
+.admins { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 12px; color: var(--ink-soft); }
+.auth { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.auth > div { background: var(--paper); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 10px 28px -16px rgba(120, 60, 70, .45); font-size: 1rem; }
+.auth .step { font-size: .72rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+.auth b.t { font-family: var(--script); font-weight: 400; font-size: 1.7rem; line-height: 1; color: var(--gold); }
+.fld { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; color: var(--ink-soft); background: #fff; font-size: .95rem; }
+.code { display: flex; gap: 5px; } .code i { flex: 1; text-align: center; font-style: normal; font-weight: 700; font-size: 1.2rem; border: 1px solid var(--gold-soft); border-radius: 6px; padding: 4px 0; background: #fff; font-variant-numeric: lining-nums; }
+.auth .pill-btn { text-align: center; }
+
+.flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; counter-reset: step; padding: 0; margin: 0; list-style: none; }
+.flow li { counter-increment: step; background: var(--paper); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.flow li::before { content: counter(step); font-style: italic; font-weight: 600; color: var(--gold); font-size: 1.3rem; font-variant-numeric: lining-nums; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 28px; }
+.two > * { min-width: 0; }
+.plain { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 8px; }
+.plain li::marker { color: var(--gold); }
+.ask { background: var(--paper); border-radius: 12px; padding: 24px; display: flex; flex-direction: column; gap: 14px; border: 1px solid var(--gold-soft); }
+.ask ol { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 10px; max-width: 78ch; }
+.ask li::marker { color: var(--gold); font-weight: 700; }
+
+@media (max-width: 760px) {
+  .three .w-phone { width: min(46%, 250px); }
+  .scene { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .wrap { gap: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .hint svg { animation: none; } }
+</style>
+
+<svg class="sym" aria-hidden="true">
+  <symbol id="i-heart" viewBox="0 0 24 22"><path fill="currentColor" d="M12 21C5 15 1 11 1 6.5A5.5 5.5 0 0 1 12 4.6 5.5 5.5 0 0 1 23 6.5C23 11 19 15 12 21Z"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 80 60">
+    <path fill="currentColor" d="M13 44 8.5 20 24 31 40 8 56 31 71.5 20 67 44Z"/>
+    <rect fill="currentColor" x="12" y="46.5" width="56" height="8" rx="1.5"/>
+    <circle fill="currentColor" cx="8" cy="17" r="3.6"/><circle fill="currentColor" cx="40" cy="5" r="4"/><circle fill="currentColor" cx="72" cy="17" r="3.6"/><circle fill="currentColor" cx="24" cy="27.5" r="2.6"/><circle fill="currentColor" cx="56" cy="27.5" r="2.6"/>
+    <path fill="#FFFBF2" d="M40 47.6l2.6 2.9-2.6 2.9-2.6-2.9zM26 48.4l2 2.1-2 2.1-2-2.1zM54 48.4l2 2.1-2 2.1-2-2.1zM40 22l4 7-4 7-4-7z" opacity=".85"/>
+  </symbol>
+  <symbol id="i-cal" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="9" width="38" height="33" rx="4"/><path d="M5 18.5h38M15 5v8M33 5v8"/></g><path fill="currentColor" d="M24 36c-4-3.2-6.2-5.4-6.2-8a3.3 3.3 0 0 1 6.2-1.5 3.3 3.3 0 0 1 6.2 1.5c0 2.6-2.2 4.8-6.2 8Z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="19.5"/><path d="M24 12v12.5l8 5"/></g></symbol>
+  <symbol id="i-pin" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M24 45S10 29.5 10 19.5a14 14 0 0 1 28 0C38 29.5 24 45 24 45Z"/><circle cx="24" cy="19.5" r="4.6"/></g></symbol>
+  <symbol id="i-flourish" viewBox="0 0 140 24"><g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M3 13c14-9 24 8 37 2s14-9 19-3c-5 1-7 4-12 3"/><path d="M137 13c-14-9-24 8-37 2s-14-9-19-3c5 1 7 4 12 3"/></g><path fill="currentColor" d="M70 5.5l3.4 6.5-3.4 6.5-3.4-6.5z"/><circle fill="currentColor" cx="70" cy="21.5" r="1.3"/></symbol>
+</svg>
+
+<template id="inv-tpl">
+  <div class="inv">
+    <p class="inv-poem">Há um ano, uma pequena flor<br>desabrochou em nossas vidas<br>e fez nascer o mais lindo<br>dos jardins: o nosso.</p>
+    <div class="inv-rule inv-r1"><i></i><svg><use href="#i-heart"/></svg><i></i></div>
+    <p class="inv-caps inv-lead">Você é nosso convidado<br>especial para celebrar</p>
+    <svg class="inv-crown"><use href="#i-crown"/></svg>
+    <div class="inv-name">Maria Alice</div>
+    <div class="inv-age"><i></i><svg><use href="#i-heart"/></svg><span>1 ano</span><svg><use href="#i-heart"/></svg><i></i></div>
+    <svg class="inv-ic inv-ic1"><use href="#i-cal"/></svg>
+    <svg class="inv-ic inv-ic2"><use href="#i-clock"/></svg>
+    <svg class="inv-ic inv-ic3"><use href="#i-pin"/></svg>
+    <p class="inv-caps inv-col inv-c1">17 de janeiro<br>de 2027</p>
+    <p class="inv-caps inv-col inv-c2">Às 17h</p>
+    <p class="inv-caps inv-col inv-c3">Pontal Kids</p>
+    <p class="inv-addr">Rua Wilfred Penha Borges, 347<br>Recreio dos Bandeirantes<br>Rio de Janeiro – RJ<br>22790-871</p>
+    <i class="inv-vr inv-v1"></i><i class="inv-vr inv-v2"></i>
+    <svg class="inv-h2"><use href="#i-heart"/></svg>
+    <p class="inv-caps inv-bye">Será uma alegria<br>ter você conosco!</p>
+    <svg class="inv-fl"><use href="#i-flourish"/></svg>
+  </div>
+</template>
+
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">Storyboard · revisão 2 · for approval</span>
+    <h1>O castelo da <em>Maria Alice</em></h1>
+    <p class="lede">Thirteen scenes, from the loading screen to the family panel. Every picture of the garden, castle and hall is a real render of the low-poly scene modeled in Blender for this project. Buttons and labels are mock-ups of the interface, in Portuguese as guests will see it.</p>
+    <div class="changes">
+      <span class="eyebrow">What changed since the first version</span>
+      <ul>
+        <li><b>Fonts.</b> The script and Garamond of your invitation card now run through the whole site, buttons included.</li>
+        <li><b>Smooth lighting.</b> Soft bounced light and soft shadows. Towers, roofs and balloons are now smooth; trees, flowers and ground keep their facets. Palette untouched.</li>
+        <li><b>Clouds.</b> Rebuilt as clusters of round spheres, large in the middle and small at the ends, like your reference.</li>
+        <li><b>Phone movement.</b> New loading screen that asks permission to use the phone's motion (Cena 1).</li>
+        <li><b>The envelope.</b> Seal drops, flap opens, the letter rises and unfolds in three. It is a working prototype you can play (Cena 8).</li>
+        <li><b>The invitation.</b> Rebuilt in HTML over your own card art (Cena 9).</li>
+        <li><b>Answers.</b> Yes or no only. No headcount. Changeable until 24 hours before the party.</li>
+        <li><b>Panel access.</b> E-mail and password, created through an e-mailed link, two administrators at most.</li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- ============================== ACT I -->
+  <section class="act">
+    <div class="act-head">
+      <span class="eyebrow">Parte 1 · arriving</span>
+      <h2>A caminhada até o castelo</h2>
+      <p>One continuous camera move tied to the scroll position. Scrolling back up walks the guest back out. The bar under each scene shows which part of the scroll it covers.</p>
+    </div>
+
+    <article class="scene">
+      <div class="phones">
+        <div class="col w-phone">
+          <div class="phone" data-fit><div class="ld">
+            <svg><use href="#i-crown"/></svg><div class="ld-name">Maria Alice</div><div class="ld-sub">1 ANO</div>
+            <div class="ld-bar"><i></i></div><div class="ld-txt">Preparando o jardim… 64%</div>
+            <div class="ld-card"><p>Quer olhar ao redor do jardim movendo o celular?</p><span class="ui-btn pri">Permitir movimento</span><span class="ui-btn ghost">Agora não</span></div>
+          </div></div>
+          <div class="cap">iPhone, while the garden loads</div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="num">Cena 1</span>
+        <h3>Carregando, e o pedido de movimento</h3>
+        <dl>
+          <dt>Sees</dt><dd>The invitation's own paper and flowers while the 3D garden downloads, with a gold progress line.</dd>
+          <dt>Asks</dt><dd>On iPhones the site must ask before reading the phone's motion, and the system only allows the question after a tap. So the question sits here, answered while the guest waits.</dd>
+          <dt>Then</dt><dd>"Permitir movimento" opens the iPhone's own permission box. Android phones need no question and skip the card. "Agora não" is fine: everything still works by scroll alone.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="scene">
+      <div class="stage">
+        <div class="col grow">
+          <div class="screen" data-fit><img src="img/01_longe.jpg" alt="Far view of the pink castle on its garden diorama, in soft light">
+            <div class="hint"><span>Role para baixo para entrar no castelo</span><svg><use href="#i-chev"/></svg></div>
+          </div>
+          <div class="cap">Desktop</div>
+        </div>
+        <div class="col" style="width:24%">
+          <div class="phone" data-fit style="width:100%"><img class="bg" src="img/01_longe_mobile.jpg" alt="Same view framed for a phone">
+            <div class="hint"><span>Role para baixo para entrar no castelo</span><svg><use href="#i-chev"/></svg></div>
+          </div>
+          <div class="cap">Phone</div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="num">Cena 2</span>
+        <h3>Longe do castelo</h3>
+        <div><div class="track"><i style="left:0;width:2%"></i></div><div class="track-l"><span>scroll 0%</span><span>100%</span></div></div>
+        <dl>
+          <dt>Sees</dt><dd>The whole diorama, framed like your Image 1.</dd>
+          <dt>Moves</dt><dd>Butterflies flutter, flags wave, clouds drift, sparkles twinkle.</dd>
+          <dt>Tilt</dt><dd>Moving the mouse on a computer, or tilting the phone, leans the camera a few degrees. Near flowers shift more than far towers, so the scene feels deep.</dd>
+          <dt>UI</dt><dd>Only the scroll hint. It fades on the first scroll.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="scene">
+      <div class="stage"><div class="screen" data-fit><img src="img/02_descida.jpg" alt="Camera descending toward the garden">
+        <div class="rail"><i style="top:18%"></i></div><div class="skip">Pular para o convite</div></div></div>
+      <div class="notes">
+        <span class="num">Cena 3</span>
+        <h3>A descida</h3>
+        <div><div class="track"><i style="left:2%;width:28%"></i></div><div class="track-l"><span>2%</span><span>30%</span></div></div>
+        <dl>
+          <dt>Sees</dt><dd>The camera glides down from the sky toward the path.</dd>
+          <dt>Moves</dt><dd>Parallax in three depths: clouds barely move, the castle grows, foreground flowers sweep past the edges.</dd>
+          <dt>UI</dt><dd>A thin progress thread on the right and a small "Pular para o convite" for guests in a hurry.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="scene">
+      <div class="stage"><div class="screen" data-fit><img src="img/03_jardim.jpg" alt="Eye-level view on the path between the flowers">
+        <div class="rail"><i style="top:48%"></i></div><div class="skip">Pular para o convite</div></div></div>
+      <div class="notes">
+        <span class="num">Cena 4</span>
+        <h3>Pelo jardim</h3>
+        <div><div class="track"><i style="left:30%;width:32%"></i></div><div class="track-l"><span>30%</span><span>62%</span></div></div>
+        <dl>
+          <dt>Sees</dt><dd>Eye level on the stone path, tulips and cosmos taller than the camera, towers overhead.</dd>
+          <dt>Moves</dt><dd>Flowers sway as the camera passes. A butterfly crosses the frame. Petals drift down from the trees.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="scene">
+      <div class="stage"><div class="screen" data-fit><img src="img/04_portoes.jpg" alt="Castle gates half open">
+        <div class="rail"><i style="top:72%"></i></div><div class="skip">Pular para o convite</div></div></div>
+      <div class="notes">
+        <span class="num">Cena 5</span>
+        <h3>Os portões se abrem</h3>
+        <div><div class="track"><i style="left:62%;width:20%"></i></div><div class="track-l"><span>62%</span><span>82%</span></div></div>
+        <dl>
+          <dt>Sees</dt><dd>The two wooden gates swing inward as the guest arrives. Warm light spills onto the path.</dd>
+          <dt>Moves</dt><dd>Gate angle follows the scroll, so the guest opens them with their own finger.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="scene">
+      <div class="stage"><div class="screen" data-fit><img src="img/05_entrada.jpg" alt="Looking through the open gate into bright light">
+        <div class="bloom" style="opacity:.5"></div><div class="rail"><i style="top:88%"></i></div></div></div>
+      <div class="notes">
+        <span class="num">Cena 6</span>
+        <h3>A travessia</h3>
+        <div><div class="track"><i style="left:82%;width:12%"></i></div><div class="track-l"><span>82%</span><span>94%</span></div></div>
+        <dl>
+          <dt>Sees</dt><dd>The arch fills the screen. The light inside grows until the whole frame is a soft cream glow.</dd>
+          <dt>Moves</dt><dd>This glow is the fade. Behind it the garden is swapped for the hall.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="scene">
+      <div class="stage"><div class="screen" data-fit><img src="img/06_salao.jpg" alt="Party hall inside the castle with balloons and cake table"></div></div>
+      <div class="notes">
+        <span class="num">Cena 7</span>
+        <h3>O salão de festa</h3>
+        <div><div class="track"><i style="left:94%;width:6%"></i></div><div class="track-l"><span>94%</span><span>100%</span></div></div>
+        <dl>
+          <dt>Sees</dt><dd>The glow clears on the hall from your Image 2: castle backdrop, cake on the round table, sweets on pedestals, balloon columns, flowers.</dd>
+          <dt>Moves</dt><dd>Balloons bob, window lights flicker gently, a slow push-in toward the cake.</dd>
+          <dt>Note</dt><dd>Still a block-out. The build adds bows, drapes and more sweets.</dd>
+        </dl>
+      </div>
+    </article>
+  </section>
+
+  <!-- ============================== ACT II -->
+  <section class="act">
+    <div class="act-head">
+      <span class="eyebrow">Parte 2 · the invitation</span>
+      <h2>O convite</h2>
+      <p>Shown as phone screens, since most guests will open the link from WhatsApp. "Família Oliveira" is an example name.</p>
+    </div>
+
+    <article class="scene">
+      <div class="phones">
+        <div class="col w-big">
+          <div class="phone" id="lt" data-fit>
+            <img class="bg hall" src="img/06_salao_mobile.jpg" alt="The hall behind the envelope"><div class="dim"></div>
+            <div class="lt-envb"><div class="lt-inside"></div><div class="lt-flap lt-flap-in"><div class="lt-flap-face"></div></div></div>
+            <div class="lt-sheet">
+              <div class="lt-panel lt-mid"><div class="lt-face" style="--i:1" data-inv></div></div>
+              <div class="lt-panel lt-bot"><div class="lt-face" style="--i:2" data-inv></div><div class="lt-face back"></div></div>
+              <div class="lt-panel lt-top"><div class="lt-face" style="--i:0" data-inv></div><div class="lt-face back"></div></div>
+              <i class="lt-crease" style="top:calc(33.333% - .6em)"></i><i class="lt-crease" style="top:calc(66.666% - .6em)"></i>
+            </div>
+            <div class="lt-envf">
+              <div class="lt-pocket"><i></i><i></i><i></i></div>
+              <div class="lt-to"><small>Para</small><b>Família Oliveira</b></div>
+              <div class="lt-flap lt-flap-out"><div class="lt-flap-face"></div></div>
+              <div class="lt-seal"><b>MA</b></div>
+            </div>
+            <div class="lt-cta open"><button class="ui-btn pri" id="lt-open" type="button">Abrir convite</button></div>
+            <div class="lt-cta rsvp"><span class="ui-btn pri">Confirmar presença</span><span class="ui-btn sec">Não poderei ir</span></div>
+          </div>
+          <button class="replay" id="lt-replay" type="button">Recomeçar</button>
+          <div class="cap">Working prototype. Press "Abrir convite".</div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="num">Cena 8</span>
+        <h3>O envelope se abre</h3>
+        <dl>
+          <dt>Arrives</dt><dd>A moment after entering the hall, the envelope slides in from below, addressed to the guest by name from their personal link.</dd>
+          <dt>Opens</dt><dd>
+            <ol>
+              <li>The gold wax seal loosens and drops away.</li>
+              <li>The flap swings open, showing the pink lining.</li>
+              <li>The letter rises out, folded in three.</li>
+              <li>The envelope sinks away and the letter comes forward.</li>
+              <li>It unfolds, top third first, then the bottom.</li>
+              <li>The two answer buttons appear.</li>
+            </ol></dd>
+          <dt>Time</dt><dd>About six seconds. With reduced motion turned on, the letter simply appears open.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="scene">
+      <div class="compare">
+        <div class="col"><div class="inv-box" data-fit data-inv></div><div class="cap">Rebuilt in HTML</div></div>
+        <div class="col"><img src="img/convite.jpg" alt="The original invitation image"><div class="cap">Your original image</div></div>
+      </div>
+      <div class="notes">
+        <span class="num">Cena 9</span>
+        <h3>O convite em HTML</h3>
+        <dl>
+          <dt>How</dt><dd>The flowers, castle, ribbon and gold frame are your own artwork with the lettering lifted off. Every word on top is live text in matching fonts, with the crown, hearts and icons redrawn as vector shapes.</dd>
+          <dt>Why</dt><dd>Text stays razor sharp at any zoom, screen readers can read it aloud, and the address can be tapped to open the map.</dd>
+          <dt>Limit</dt><dd>The script font is a close match, not the identical one, so letter shapes in "Maria Alice" differ slightly from the original.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="scene">
+      <div class="phones three">
+        <div class="col w-phone">
+          <div class="phone" data-fit><img class="bg hall" src="img/06_salao_mobile.jpg" alt=""><div class="dim"></div>
+            <div class="mini-inv"><div class="inv-box" data-fit data-inv></div></div>
+            <div class="sheet"><h4>Presença confirmada</h4><p>Esperamos vocês no dia 17 de janeiro de 2027, às 17h, no Pontal Kids.</p>
+              <span class="ui-btn pri">Adicionar à agenda</span><span class="ui-btn sec">Ver no mapa</span>
+              <small>Mudou de planos? Você pode alterar a resposta até 16 de janeiro, às 17h.</small></div>
+          </div>
+          <div class="cap">Said yes</div>
+        </div>
+        <div class="col w-phone">
+          <div class="phone" data-fit><img class="bg hall" src="img/06_salao_mobile.jpg" alt=""><div class="dim"></div>
+            <div class="mini-inv"><div class="inv-box" data-fit data-inv></div></div>
+            <div class="sheet"><h4>Sentiremos sua falta</h4><p>Obrigado por avisar. Se os planos mudarem, é só voltar a este link.</p>
+              <span class="ui-btn sec">Alterar resposta</span>
+              <small>Você pode alterar a resposta até 16 de janeiro, às 17h.</small></div>
+          </div>
+          <div class="cap">Said no</div>
+        </div>
+        <div class="col w-phone">
+          <div class="phone" data-fit><img class="bg hall" src="img/06_salao_mobile.jpg" alt=""><div class="dim"></div>
+            <div class="mini-inv"><div class="inv-box" data-fit data-inv></div></div>
+            <div class="sheet"><h4>Respostas encerradas</h4><p>Sua resposta: presença confirmada. Nos vemos no dia 17!</p>
+              <span class="ui-btn sec">Ver no mapa</span>
+              <small>As respostas foram encerradas 24 horas antes da festa.</small></div>
+          </div>
+          <div class="cap">Final 24 hours</div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="num">Cena 10</span>
+        <h3>A resposta</h3>
+        <dl>
+          <dt>Answer</dt><dd>One tap on "Confirmar presença" or "Não poderei ir". Nothing else is asked. The invitation already says who it is for.</dd>
+          <dt>After</dt><dd>On yes, balloons and petals rise in the hall, and the guest can save the date and open the map.</dd>
+          <dt>Change</dt><dd>The same link shows the current answer and lets the guest switch it until 16 January 2027 at 17h, 24 hours before the party.</dd>
+          <dt>Closed</dt><dd>In the final 24 hours the answer is shown but locked.</dd>
+        </dl>
+      </div>
+    </article>
+  </section>
+
+  <!-- ============================== ACT III -->
+  <section class="act">
+    <div class="act-head">
+      <span class="eyebrow">Parte 3 · behind the gates</span>
+      <h2>Links e painel</h2>
+      <p>The site only opens through a link generated in the panel. Each link belongs to one household, family, couple or person.</p>
+    </div>
+
+    <ol class="flow">
+      <li><b>You create an invitation</b><span>Just the name to write on the envelope.</span></li>
+      <li><b>The panel gives you a link</b><code>seudominio/c/k7Qm2xLp</code><span>Copy it or send it by WhatsApp.</span></li>
+      <li><b>The guest walks to the castle</b><span>The envelope carries their name.</span></li>
+      <li><b>The answer is saved on your server</b><span>One database file on the VPS. The panel updates right away.</span></li>
+    </ol>
+
+    <article class="scene">
+      <div class="stage"><div class="screen" data-fit><img src="img/03_jardim.jpg" alt="Castle with gates closed"><div class="dim"></div>
+        <div class="msg"><b>Este convite é pessoal</b><p>Para entrar no castelo, use o link que a família da Maria Alice enviou para você.</p></div></div></div>
+      <div class="notes">
+        <span class="num">Cena 11</span>
+        <h3>Sem link, portões fechados</h3>
+        <dl>
+          <dt>When</dt><dd>Someone opens the address without a valid link, or with one you deleted.</dd>
+          <dt>Sees</dt><dd>The castle with its gates shut and a short, kind message. No journey, no party details.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="scene">
+      <div class="auth">
+        <div><span class="step">1 · E-mail recebido</span><b class="t">Crie sua conta</b><span>Você foi escolhido para cuidar dos convites da Maria Alice.</span><span class="pill-btn">Criar minha conta</span><span class="example">O link vale por 24 horas e só funciona uma vez.</span></div>
+        <div><span class="step">2 · Criar senha</span><b class="t">Sua senha</b><div class="fld">voce@exemplo.com</div><div class="fld">Nova senha</div><div class="fld">Repita a senha</div><span class="pill-btn">Salvar</span></div>
+        <div><span class="step">3 · Entrar</span><b class="t">Painel</b><div class="fld">voce@exemplo.com</div><div class="fld">••••••••••</div><span class="pill-btn">Entrar</span></div>
+        <div><span class="step">4 · Código por e-mail</span><b class="t">Confirme</b><span>Enviamos um código de 6 dígitos para o seu e-mail.</span><div class="code"><i>4</i><i>8</i><i>1</i><i>9</i><i>0</i><i>3</i></div><span class="example">O código vale por 10 minutos.</span></div>
+      </div>
+      <div class="notes">
+        <span class="num">Cena 12</span>
+        <h3>Acesso ao painel</h3>
+        <dl>
+          <dt>First</dt><dd>The first time the server starts, it e-mails one address a link to create the only account. No account can be created any other way.</dd>
+          <dt>Sign in</dt><dd>E-mail and password, then a one-time code sent to that e-mail.</dd>
+          <dt>Second</dt><dd>The administrator can invite one more e-mail from the panel. That person goes through the same four steps. Two is the maximum.</dd>
+          <dt>My reading</dt><dd>You wrote "OAuth2 sent via email". I took that as this e-mailed link plus e-mailed code. Tell me if you meant something else.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="scene">
+      <div class="admin">
+        <div class="admin-top"><strong>Convites da Maria Alice</strong><span class="pill-btn">+ Novo convite</span></div>
+        <div class="stats">
+          <div class="stat"><b>42</b><span>convites</span></div>
+          <div class="stat"><b>27</b><span>confirmados</span></div>
+          <div class="stat"><b>4</b><span>não vão</span></div>
+          <div class="stat"><b>11</b><span>pendentes</span></div>
+        </div>
+        <div class="tbl"><table>
+          <thead><tr><th>Convite</th><th>Resposta</th><th>Abriu</th><th>Respondeu</th><th>Link</th></tr></thead>
+          <tbody>
+            <tr><td>Família Oliveira</td><td><span class="st ok">Confirmado</span></td><td>12/12</td><td>12/12</td><td><span class="link">Copiar</span> · <span class="link">WhatsApp</span></td></tr>
+            <tr><td>Vovó Lúcia</td><td><span class="st ok">Confirmado</span></td><td>11/12</td><td>13/12</td><td><span class="link">Copiar</span> · <span class="link">WhatsApp</span></td></tr>
+            <tr><td>Carla e Beto</td><td><span class="st no">Não vai</span></td><td>13/12</td><td>13/12</td><td><span class="link">Copiar</span> · <span class="link">WhatsApp</span></td></tr>
+            <tr><td>Padrinhos Renata e Diego</td><td><span class="st wait">Pendente</span></td><td>ainda não</td><td>—</td><td><span class="link">Copiar</span> · <span class="link">WhatsApp</span></td></tr>
+          </tbody>
+        </table></div>
+        <div class="admins"><span>Administradores: 1 de 2</span><span class="link">Convidar por e-mail</span></div>
+        <span class="example">Example data, to show the layout.</span>
+      </div>
+      <div class="notes">
+        <span class="num">Cena 13</span>
+        <h3>Painel da família</h3>
+        <dl>
+          <dt>Does</dt><dd>Create, rename or delete invitations. Copy each link or send it by WhatsApp. Export the list as a spreadsheet.</dd>
+          <dt>Shows</dt><dd>Who said yes, who said no, and who opened the link without answering yet.</dd>
+          <dt>Look</dt><dd>The same cream, gold and pink, kept plain.</dd>
+        </dl>
+      </div>
+    </article>
+  </section>
+
+  <!-- ============================== BUILD -->
+  <section class="act">
+    <div class="act-head">
+      <span class="eyebrow">How it gets built</span>
+      <h2>Plano de construção</h2>
+    </div>
+    <div class="two">
+      <ul class="plain">
+        <li><b>3D models.</b> The Blender scene is exported as compact glTF files, with gates, flags and butterflies as separate moving pieces.</li>
+        <li><b>Soft light on phones.</b> The smooth lighting in these frames is baked into the models in Blender, so a phone shows it without heavy real-time work.</li>
+        <li><b>In the browser.</b> Three.js draws the scene. Scroll drives the camera, the gates, the glow and the fade. Mouse or phone tilt adds the small parallax.</li>
+        <li><b>Invitation.</b> The HTML card and the envelope prototype on this page become the real component.</li>
+      </ul>
+      <ul class="plain">
+        <li><b>Server.</b> A small Node server and one SQLite file on your VPS, with automatic HTTPS. HTTPS is also what lets iPhones grant the motion permission.</li>
+        <li><b>Domain.</b> You register the name. I have not checked whether convite.ai or any other name is free.</li>
+        <li><b>E-mail.</b> Account links and sign-in codes need a sending account (any SMTP provider). I need its details at deploy time.</li>
+        <li><b>Fallback.</b> If a device cannot run 3D, or reduced motion is on, the journey plays as a crossfade of still renders.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="ask">
+    <span class="eyebrow">Before I build</span>
+    <h2>Two things to confirm</h2>
+    <ol>
+      <li><b>Panel sign-in.</b> Is Cena 12 what you meant: e-mailed link to create the account, then e-mail, password and an e-mailed code on each sign-in?</li>
+      <li><b>Smooth towers.</b> To get smooth light on the castle I rounded its towers and roofs, as in your Image 1. Trees, clouds, flowers and ground stayed faceted. Say so if you want the castle faceted too.</li>
+    </ol>
+  </section>
+</div>
+
+<script>
+(() => {
+  // every mock sizes its type from its own width: 1em = 1% of the mock
+  const fit = el => { const w = el.clientWidth; if (w) el.style.fontSize = (w / 100) + 'px'; };
+  const tpl = document.getElementById('inv-tpl');
+  document.querySelectorAll('[data-inv]').forEach(el => el.appendChild(tpl.content.cloneNode(true)));
+  const fits = [...document.querySelectorAll('[data-fit]')];
+  const fitAll = () => fits.forEach(fit);
+  fitAll();
+  if ('ResizeObserver' in window) { const ro = new ResizeObserver(es => es.forEach(e => fit(e.target))); fits.forEach(el => ro.observe(el)); }
+  else addEventListener('resize', fitAll);
+
+  // ---- envelope prototype
+  const stage = document.getElementById('lt');
+  const q = s => stage.querySelector(s);
+  const sheet = q('.lt-sheet'), envb = q('.lt-envb'), envf = q('.lt-envf'), seal = q('.lt-seal');
+  const flaps = stage.querySelectorAll('.lt-flap'), top = q('.lt-top'), bot = q('.lt-bot');
+  const openCta = q('.lt-cta.open'), rsvp = q('.lt-cta.rsvp'), creases = stage.querySelectorAll('.lt-crease');
+  let anims = [], T0 = '', T1 = '';
+  const place = () => {
+    sheet.style.transform = 'none';
+    const e = envb.getBoundingClientRect(), s = sheet.getBoundingClientRect();
+    if (!s.width) return;
+    const k = e.width * 0.9 / s.width;
+    const dx = (e.left + e.width / 2) - (s.left + s.width / 2);
+    const dy = (e.top + e.height * 0.53) - (s.top + s.height / 2);
+    T0 = `translate(${dx}px, ${dy}px) scale(${k})`;
+    T1 = `translate(${dx}px, ${dy - e.height * 1.02}px) scale(${k})`;
+    sheet.style.transform = T0;
+  };
+  const reset = () => { anims.forEach(a => a.cancel()); anims = []; place(); };
+  const play = () => {
+    reset();
+    const ease = 'cubic-bezier(.45,0,.2,1)';
+    const run = (el, frames, opts) => anims.push(el.animate(frames, Object.assign({ fill: 'both', easing: ease }, opts)));
+    run(openCta, [{ opacity: 1 }, { opacity: 0 }], { duration: 350 });
+    run(seal, [
+      { transform: 'translate(-50%,-50%) rotate(0deg)', opacity: 1, offset: 0 },
+      { transform: 'translate(-50%,-50%) rotate(-8deg)', offset: .16 },
+      { transform: 'translate(-50%,-47%) rotate(6deg)', offset: .3 },
+      { transform: 'translate(-47%,-30%) rotate(10deg)', opacity: 1, offset: .5 },
+      { transform: 'translate(-40%,240%) rotate(36deg)', opacity: 0, offset: 1 }
+    ], { duration: 1500, easing: 'cubic-bezier(.45,0,.75,.45)' });
+    flaps.forEach(f => run(f, [{ transform: 'perspective(120em) rotateX(0deg)' }, { transform: 'perspective(120em) rotateX(180deg)' }], { duration: 1000, delay: 1250 }));
+    run(sheet, [{ transform: T0, easing: ease }, { transform: T1, offset: .42, easing: ease }, { transform: 'translate(0px, 0px) scale(1)' }], { duration: 2300, delay: 2150 });
+    [envb, envf].forEach(e => run(e, [{ transform: 'translateY(0)', opacity: 1 }, { transform: 'translateY(40%)', opacity: 0 }], { duration: 900, delay: 3100, easing: 'ease-in' }));
+    run(top, [{ transform: 'perspective(160em) rotateX(-180deg)' }, { transform: 'perspective(160em) rotateX(0deg)' }], { duration: 1100, delay: 4300 });
+    run(bot, [{ transform: 'perspective(160em) rotateX(180deg)' }, { transform: 'perspective(160em) rotateX(0deg)' }], { duration: 1100, delay: 4950 });
+    creases.forEach(c => run(c, [{ opacity: 0 }, { opacity: 1 }], { duration: 500, delay: 5700 }));
+    run(rsvp, [{ opacity: 0, transform: 'translateY(12%)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 600, delay: 6000 });
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) anims.forEach(a => a.finish());
+  };
+  place();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (!anims.length) place(); });
+  addEventListener('resize', () => { if (!anims.length) place(); });
+  document.getElementById('lt-open').addEventListener('click', play);
+  document.getElementById('lt-replay').addEventListener('click', reset);
+})();
+</script>
