@@ -1,9 +1,9 @@
 /* The page after the letter opens: gift ideas and the goodbye, as cards over the hall, plus the
    small things pinned to the screen (scroll cue, progress rail, petals, dialog, toast).
    Every text sits on paper, so it reads the same over a pink hall or a blue sky. */
-.pg-sec { position: relative; display: grid; place-items: center; padding: 9vh 16px; }
-.pg-gifts { min-height: 88%; }
-.pg-end { min-height: 66%; padding-bottom: calc(12vh + env(safe-area-inset-bottom, 0px)); }
+/* The cards follow one another closely, with the same breathing room between each pair. */
+.pg-sec { position: relative; display: grid; place-items: center; padding: clamp(18px, 3.2vh, 30px) 16px 0; }
+.pg-end { padding-bottom: calc(clamp(40px, 9vh, 84px) + env(safe-area-inset-bottom, 0px)); }
 .pg-float { width: min(100%, 620px); will-change: transform; }
 .pg-card { position: relative; background: rgba(255, 251, 246, .97); border-radius: 26px; padding: clamp(28px, 7vw, 46px) clamp(18px, 5.5vw, 46px) clamp(30px, 7vw, 46px); text-align: center;
   box-shadow: inset 0 0 0 1px var(--gold-hi), 0 26px 50px -30px rgba(80, 35, 45, .7); }

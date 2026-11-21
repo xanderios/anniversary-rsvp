@@ -87,7 +87,6 @@ export function createLetter(stage, dados, { token, onOpen }) {
         <div class="lt-panel lt-mid"><div class="lt-face" style="--i:1"></div></div>
         <div class="lt-panel lt-bot"><div class="lt-face" style="--i:2"></div><div class="lt-face back"></div></div>
         <div class="lt-panel lt-top"><div class="lt-face" style="--i:0"></div><div class="lt-face back"></div></div>
-        <i class="lt-crease c1"></i><i class="lt-crease c2"></i>
       </div>
       <div class="lt-env lt-envf">
         <div class="lt-pocket">${BOLSO}</div>
@@ -97,14 +96,13 @@ export function createLetter(stage, dados, { token, onOpen }) {
       </div>
       <div class="lt-open"><button class="btn pri" type="button" data-act="open">Abrir convite</button></div>
       <div class="rsvp" hidden></div>
-      <div class="lt-more" aria-hidden="true" hidden><svg><use href="#i-chev"/></svg></div>
       <p class="sr-only" data-texto></p>
     </div>`;
 
   const $ = (s) => stage.querySelector(s);
   const lt = $('.lt'), sheet = $('.lt-sheet'), envb = $('.lt-envb'), envf = $('.lt-envf'), seal = $('.lt-seal');
   const flapIn = $('.lt-flap-in'), flapOut = $('.lt-flap-out'), top = $('.lt-top'), bot = $('.lt-bot');
-  const abrir = $('.lt-open'), rsvp = $('.rsvp'), mais = $('.lt-more'), confete = document.getElementById('confete'), veil = document.getElementById('veil');
+  const abrir = $('.lt-open'), rsvp = $('.rsvp'), confete = document.getElementById('confete'), veil = document.getElementById('veil');
   const page = createPage(stage, dados);
 
   // text set as text, never as markup
@@ -240,6 +238,9 @@ export function createLetter(stage, dados, { token, onOpen }) {
     run(flapOut, [{ opacity: 1, easing: 'steps(1, end)' }, { opacity: 0 }], { duration: 500, delay: 1250, easing: 'linear' });
     run(flapIn, [{ opacity: 0, easing: 'steps(1, end)' }, { opacity: 1 }], { duration: 500, delay: 1250, easing: 'linear' });
     run(sheet, [{ transform: T0, easing: EASE }, { transform: T1, offset: 0.42, easing: EASE }, { transform: 'translate(0px, 0px) scale(1)' }], { duration: 2300, delay: 2150 });
+    // Once the letter has risen clear of the envelope it is out of it: on its way down it passes in
+    // front of the whole envelope (never back under the pocket's folds).
+    run(sheet, [{ zIndex: 2, easing: 'steps(1, end)' }, { zIndex: 4 }], { duration: 2300 * 0.42, delay: 2150, easing: 'linear' });
     [envb, envf].forEach((e) => run(e, [{ transform: 'translateY(0)', opacity: 1 }, { transform: 'translateY(40%)', opacity: 0 }], { duration: 900, delay: 3100, easing: 'ease-in' }));
     run(top, [{ transform: 'perspective(160em) rotateX(-180deg)' }, { transform: 'perspective(160em) rotateX(0deg)' }], { duration: 1100, delay: 4300 });
     const fim = run(bot, [{ transform: 'perspective(160em) rotateX(180deg)' }, { transform: 'perspective(160em) rotateX(0deg)' }], { duration: 1100, delay: 4950 });
@@ -268,9 +269,9 @@ export function createLetter(stage, dados, { token, onOpen }) {
     // from here on the stage is a page: the answer sits right under the letter
     const semResposta = !dados.resposta && !dados.encerrado;
     mostrar(semResposta ? 'pedir' : 'resposta');
-    rsvp.hidden = mais.hidden = false;
+    rsvp.hidden = false;
     page.start({ alvo: rsvp, texto: semResposta ? 'Role para responder' : 'Role para ver sua resposta' });
-    if (!calmo()) [rsvp, mais].forEach((el) => el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 700, delay: 150, fill: 'backwards', easing: 'ease' }));
+    if (!calmo()) rsvp.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 700, delay: 150, fill: 'backwards', easing: 'ease' });
     sheet.focus({ preventScroll: true });
   }
 

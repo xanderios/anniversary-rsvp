@@ -224,7 +224,7 @@ export function createPage(stage, dados) {
       const centro = y + vh / 2;
       for (const f of flutuam) {
         const d = clamp(f.meio - centro, -vh, vh);
-        f.el.style.transform = `translate3d(0,${(d * 0.07).toFixed(1)}px,0)`;
+        f.el.style.transform = `translate3d(0,${(d * 0.04).toFixed(1)}px,0)`;   // a gentle drift: the cards stay close to one another
         if (f.orn) f.orn.style.transform = `translate3d(0,${clamp(d * -0.045, -10, 10).toFixed(1)}px,0)`;
       }
       for (const p of petalas) {
