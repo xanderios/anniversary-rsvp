@@ -24,7 +24,7 @@ npm start                 # http://localhost:3000 (ou a PORT do .env)
 - O convite inteiro é uma rolagem só: o passeio pelo jardim, o salão, o envelope que sobe, o selo que se rompe, a carta
   que sai e se desdobra e, depois dela, a resposta, os presentes e a despedida. Rolar para cima desfaz tudo, até o
   jardim. O selo e o aviso "Role para abrir o convite" também são botões (rolam a abertura sozinhos), e "Pular para o
-  convite" leva até o envelope ainda fechado. O tamanho de cada trecho está em `web/src/scene/journey.js`
+  convite" leva até a carta já aberta (passa pelo envelope, pelo selo e pelo desdobrar). O tamanho de cada trecho está em `web/src/scene/journey.js`
   (`TAIL_SCREENS`, `OPEN_SCREENS`, `ENVELOPE`, `OPENING`). Com "reduzir movimento" ligado, a carta só tem dois estados:
   fechada e aberta.
 - A última linha da página é o crédito "Feito com ❤️ por Alexandre Rios" (`CREDITO` em `web/src/ui/page.js`).

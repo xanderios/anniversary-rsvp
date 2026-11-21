@@ -1,5 +1,5 @@
 import './styles/app.css';
-import { CAPTIONS, ENVELOPE, FADE_OUT, OPENED, OPENING, REACH, SWAP, TRACK_SCREENS, fadeAt, span } from './scene/journey.js';
+import { CAPTIONS, ENVELOPE, FADE_OUT, OPENED, OPENING, SWAP, TRACK_SCREENS, fadeAt, span } from './scene/journey.js';
 import { createTilt } from './ui/tilt.js';
 import { createLetter } from './ui/letter.js';
 import './styles/scene.css';
@@ -252,12 +252,11 @@ async function start() {
     passeando = false;
     guide.classList.remove('riding');
   }
-  // scrolls to `ate` at an even pace (`porTela` ms for each screen of distance), soft at both ends
-  function passear(ate, porTela = 1300) {
+  // scrolls to `ate` at an even pace (`porTela` ms for each screen of distance, `teto` ms at most), soft at both ends
+  function passear(ate, porTela = 1300, teto = 11000) {
     const de = scrollY, dist = ate - de;
     if (Math.abs(dist) < 2) return;
-    // the whole crossing of the garden takes some 11 s
-    const dur = calmo ? 1 : Math.min(11000, Math.max(700, (Math.abs(dist) / innerHeight) * porTela)), t0 = performance.now();
+    const dur = calmo ? 1 : Math.min(teto, Math.max(700, (Math.abs(dist) / innerHeight) * porTela)), t0 = performance.now();
     cancelAnimationFrame(passeio);
     passeando = true;
     chegando = false;
@@ -270,7 +269,9 @@ async function start() {
     };
     passeio = requestAnimationFrame(passo);
   }
-  skip.addEventListener('click', () => passear(unidade * REACH));   // as far as the envelope, in place and still sealed
+  // "skip" goes all the way to the open letter: the garden at the pace it always had (some 11 s), then the
+  // envelope, the seal and the unfolding in the seconds that follow
+  skip.addEventListener('click', () => { letter.follow(); passear(track.offsetHeight, 1300, 15000); });
   ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach((evn) => addEventListener(evn, (e) => { if (!skip.contains(e.target)) parar(); }, { passive: true }));
 
   const suave = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);

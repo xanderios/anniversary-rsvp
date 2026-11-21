@@ -426,6 +426,8 @@ export function createLetter(stage, dados, { token, onRide }) {
     unfold,
     // one step of the main loop: the open page's scroll progress, 0 (top) to 1 (bottom); 0 until the letter is open
     tick: (dt) => page.tick(dt),
+    // a ride is bringing the visitor to the open letter: once it lies open, reading goes on in it
+    follow() { focar = true; },
     get estado() { return estado; },
   };
 }

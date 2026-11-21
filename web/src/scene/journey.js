@@ -33,8 +33,8 @@ export const FADE_OUT = [0.9, 0.95];
 const WALK = TRACK_SCREENS - 1;          // screens of scroll in one journey (0 to 1)
 export const TAIL_SCREENS = 1;           // the hall and the envelope's arrival, in screen heights
 export const OPEN_SCREENS = 3;           // the opening: seal, flap, the letter out and unfolded
-export const REACH = 1 + TAIL_SCREENS / WALK;         // the envelope is in place (where "skip" stops), in journeys
-export const OPENED = REACH + OPEN_SCREENS / WALK;    // the letter lies open: here the pinned scroll ends and the page moves
+export const REACH = 1 + TAIL_SCREENS / WALK;         // the envelope is in place, still sealed, in journeys
+export const OPENED = REACH + OPEN_SCREENS / WALK;    // the letter lies open (where "skip" stops): here the pinned scroll ends and the page moves
 export const ENVELOPE = [1.025, 1.105];  // the envelope: still below the screen, in place (in journeys)
 export const OPENING = [REACH + 0.22 / WALK, OPENED - 0.12 / WALK];   // the opening, with a short rest at each end
 // what the little indicator says while the "skip" ride crosses the garden
