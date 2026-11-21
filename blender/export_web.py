@@ -196,7 +196,8 @@ class Group:
         self.lamp = self.bm.loops.layers.uv.new("Lamp") if lamps else None
         self.gone = []          # faces to leave out (never seen), removed in one go when the mesh is built
 
-    def add(self, ob, cols, uvfun=None):
+    def add(self, ob, cols, uvfun=None, only=None):
+        """only: a test on the source material's name; facets that fail it are left out."""
         me, bm = ob.data, self.bm
         nv, nf = len(bm.verts), len(bm.faces)
         bm.from_mesh(me)
@@ -205,8 +206,11 @@ class Group:
         for v in bm.verts[nv:]:
             v.co = M @ v.co
         emis = [m.name.endswith("_e") for m in me.materials]
+        names = [m.name for m in me.materials]
         col, uv = self.bm.loops.layers.float_color["Col"], self.bm.loops.layers.uv["UVMap"]
         for f, p in zip(bm.faces[nf:], me.polygons):
+            if only and not only(names[p.material_index]):
+                self.gone.append(f)
             f.material_index = 1 if emis[p.material_index] else 0
             for l, li in zip(f.loops, p.loop_indices):
                 l[col] = cols[li]
@@ -225,7 +229,7 @@ class Group:
         # still one wall): every other edge of a flat facet stays crisp.
         bm = self.bm
         if self.gone:
-            bmesh.ops.delete(bm, geom=self.gone, context="FACES")
+            bmesh.ops.delete(bm, geom=list(set(self.gone)), context="FACES")
         bm.normal_update()
         for e in bm.edges:
             fs = e.link_faces
@@ -309,13 +313,24 @@ bvh = world_bvh(static_occluders + trees)
 g = Group("Ground", lamps=True)
 for n in ("Terrain", "Path"):
     g.add(O[n], loop_colors(O[n], bvh, 2.6, 0.75))
-g.build(G)
+_gw = g.build(G)
+_gw["fireflies"] = [round(c, 2) for p in FIREFLIES for c in p]      # where they hover (Blender x, y, z ...), read by world.js
 print("ground done", flush=True)
 
-g = Group("Castle", lamps=True)
+
+def is_roof(name):
+    return name == "roof"
+
+
 fine = refined(O["Castle"], Q["wall_edge"])
-g.add(fine, loop_colors(fine, bvh, 1.3, 0.62))
+_cols = loop_colors(fine, bvh, 1.3, 0.62)
+g = Group("Castle", lamps=True)
+g.add(fine, _cols, only=lambda n: not is_roof(n))
 castle_w = g.build(G)
+
+g = Group("CastleRoof", lamps=True)          # the roofs are a mesh of their own: the walls' soft fill light is not for them
+g.add(fine, _cols, only=is_roof)
+g.build(G)
 
 g = Group("CastleTrim", lamps=True)          # windows: flat colour, no baked shade around them
 g.add(O["CastleTrim"], plain(O["CastleTrim"]))

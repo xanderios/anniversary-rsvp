@@ -4,7 +4,7 @@ import { createTilt } from './ui/tilt.js';
 import { createLetter } from './ui/letter.js';
 import './styles/scene.css';
 import { LEVELS, PRESETS, createGovernor, detectLevel, saveChoice, savedChoice } from './quality.js';
-import { nightAt, paintSky } from './scene/sky.js';
+import { nightAt, paintSky, saveSky, savedSky } from './scene/sky.js';
 import { createSettings } from './ui/settings.js';
 
 const $ = (id) => document.getElementById(id);
@@ -56,7 +56,10 @@ async function start() {
   // ---- the journey renderer: real-time 3D, or still renders as a fallback
   const fill = $('ld-fill'), txt = $('ld-txt');
   const progresso = (f) => { fill.style.width = Math.max(4, Math.round(f * 100)) + '%'; txt.textContent = `Preparando o jardim… ${Math.round(f * 100)}%`; };
-  paintSky(nightAt());                       // blue by day, starry by night: the guest's own clock decides
+  // blue by day, starry by night: the guest's own clock decides, until they pick one in the settings
+  let ceuEscolha = savedSky();               // 'dia' | 'noite' once picked
+  let ceu = ceuEscolha ? +(ceuEscolha === 'noite') : nightAt(), ceuAlvo = ceu;   // 0 = day, 1 = night: what is drawn, and where it is heading
+  paintSky(ceu);
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('fotos')) return tirarFotos(txt);
   let world = null, createWorld = null;
   let escolha = savedChoice(), nivel = null, detectado = null, trocando = false;   // escolha: auto | low | medium | high
@@ -67,14 +70,14 @@ async function start() {
       detectado = await detectLevel();
       nivel = escolha === 'auto' ? detectado : escolha;
       try {
-        world = await createWorld($('gl'), progresso, { preset: PRESETS[nivel], night: nightAt() });
+        world = await createWorld($('gl'), progresso, { preset: PRESETS[nivel], night: ceu });
       } catch (e) {
         if (nivel === 'low') throw e;
         console.warn('Cena 3D pesada demais para este aparelho; usando a versão leve.', e);
         const novo = $('gl').cloneNode(false);   // a canvas keeps its first context: start over on a fresh one
         $('gl').replaceWith(novo);
         nivel = 'low';
-        world = await createWorld(novo, progresso, { preset: PRESETS.low, night: nightAt() });
+        world = await createWorld(novo, progresso, { preset: PRESETS.low, night: ceu });
       }
     } catch (e) {
       console.warn('3D indisponível, usando imagens.', e);
@@ -84,7 +87,7 @@ async function start() {
   if (!world) {
     $('gl').hidden = true;
     const { createStills } = await import('./scene/stills.js');
-    world = createStills($('stills'), nightAt());
+    world = createStills($('stills'), ceu);
     await world.ready;
   }
   marcar();
@@ -109,6 +112,12 @@ async function start() {
       if (alvoNivel !== nivel) trocar(alvoNivel);
       else { governor.reset(PRESETS[nivel].minScale, escolha === 'auto'); settings.update({ choice: escolha, level: nivel }); }
     },
+    onSky(v) {                                 // day or night, by hand: the scene turns to it over a moment (see the loop)
+      ceuEscolha = v;
+      saveSky(v);
+      ceuAlvo = +(v === 'noite');
+      settings.sky(v);
+    },
   }) : null;
   // Changing preset loads that preset's models into a second canvas, then swaps the two on one frame.
   async function trocar(novoNivel) {
@@ -121,7 +130,7 @@ async function start() {
     novo.setAttribute('aria-hidden', 'true');
     antigo.before(novo);                       // underneath the current one until it is ready
     try {
-      const outro = await createWorld(novo, null, { preset: PRESETS[novoNivel], night: nightAt() });
+      const outro = await createWorld(novo, null, { preset: PRESETS[novoNivel], night: ceu });
       if (quadro) outro.frame(...quadro());
       const velho = world;
       world = outro;
@@ -143,7 +152,12 @@ async function start() {
   if (nivel) {
     governor.reset(PRESETS[nivel].minScale, escolha === 'auto');
     settings.update({ choice: escolha, level: nivel });
-    setInterval(() => { const n = nightAt(); paintSky(n); world.setNight?.(n); }, 60000);
+    settings.sky(ceu > 0.5 ? 'noite' : 'dia');
+    setInterval(() => {                        // dusk and dawn arrive by the clock, unless the guest picked a sky
+      if (ceuEscolha) return;
+      ceuAlvo = nightAt();
+      settings.sky(ceuAlvo > 0.5 ? 'noite' : 'dia');
+    }, 60000);
   }
   progresso(1);
   txt.textContent = 'Tudo pronto';
@@ -264,6 +278,11 @@ async function start() {
     const real = (agora - antes) / 1000, dt = Math.min(0.05, real);
     antes = agora;
     governor.tick(real);
+    if (ceu !== ceuAlvo) {                     // day turns into night, or back, over a second and a half
+      ceu = ceuAlvo > ceu ? Math.min(ceuAlvo, ceu + dt / 1.5) : Math.max(ceuAlvo, ceu - dt / 1.5);
+      paintSky(ceu);
+      world.setNight?.(ceu);
+    }
     const a = aberto ? 1 : alvo(); // once the letter is open the journey stays in the hall
     p += (a - p) * (1 - Math.exp(-dt * (calmo ? 30 : 5)));
     if (Math.abs(a - p) < 0.0004) p = a;

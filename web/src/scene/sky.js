@@ -20,6 +20,21 @@ export function nightAt(date = new Date()) {
   return h - 17.5;
 }
 
+// The guest may also pick day or night in the settings (the cog); the pick lasts for this visit,
+// and the next one follows the clock again.
+const KEY = 'convite:ceu';
+export function savedSky() {
+  try {
+    const v = sessionStorage.getItem(KEY);
+    return v === 'dia' || v === 'noite' ? v : null;
+  } catch {
+    return null;
+  }
+}
+export function saveSky(v) {
+  try { sessionStorage.setItem(KEY, v); } catch { /* private mode: the pick lasts until the page is reloaded */ }
+}
+
 const canal = (hex, i) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
 export function mixHex(a, b, t) {
   return '#' + [0, 1, 2].map((i) => Math.round(canal(a, i) + (canal(b, i) - canal(a, i)) * t).toString(16).padStart(2, '0')).join('');
